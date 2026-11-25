@@ -7,7 +7,7 @@ from tkinter import filedialog, messagebox, scrolledtext, ttk
 
 from codex_healer import auto_heal
 from install_engine import InstallOptions, STEPS, run_install
-from openclaw_detect import detect_openclaw, verify_api_key, verify_telegram_token
+from openclaw_detect import detect_installed_modules, detect_openclaw, verify_api_key, verify_telegram_token
 from openclaw_merge import restore_latest_backup
 
 APP_VERSION = "v25.11.2026"
@@ -113,22 +113,28 @@ class InstallerApp(tk.Tk):
         self.det_meta = tk.Label(det, text="", font=("Segoe UI", 8.5), bg=BG_CARD, fg=TEXT_SUB, anchor="w", justify="left", wraplength=260)
         self.det_meta.pack(fill="x")
 
-        # Modular Selection Card (Cài từng phần)
+        # Modular Selection Card (Cài từng phần + trạng thái Đã cài / Chưa cài)
         mod_outer, mod = self._card(left, pad=12)
         mod_outer.pack(fill="x", pady=(0, 10))
-        tk.Label(mod, text="Chọn phần muốn cài (Cài từng phần)", font=("Segoe UI", 10, "bold"), bg=BG_CARD, fg=TEXT_MAIN).pack(anchor="w", pady=(0, 4))
+        tk.Label(mod, text="Chọn phần muốn cài (Cài từng phần)", font=("Segoe UI", 10, "bold"), bg=BG_CARD, fg=TEXT_MAIN).pack(anchor="w", pady=(0, 6))
         self.mod_video_var = tk.BooleanVar(value=True)
         self.mod_google_var = tk.BooleanVar(value=False)
         self.mod_fb_var = tk.BooleanVar(value=False)
         self.mod_yt_var = tk.BooleanVar(value=False)
-        for var, label in [
-            (self.mod_video_var, "🎬 Tạo Video 9:16 (Lõi chính)"),
-            (self.mod_google_var, "📊 Google Sheet & Drive (tuỳ chọn)"),
-            (self.mod_fb_var, "📘 Tự động đăng Facebook (tuỳ chọn)"),
-            (self.mod_yt_var, "▶️ Tự động đăng YouTube (tuỳ chọn)"),
+        self.mod_badges = {}
+        for key, var, label in [
+            ("video", self.mod_video_var, "🎬 Tạo Video 9:16"),
+            ("google", self.mod_google_var, "📊 Google Sheet & Drive"),
+            ("facebook", self.mod_fb_var, "📘 Đăng Facebook"),
+            ("youtube", self.mod_yt_var, "▶️ Đăng YouTube"),
         ]:
-            tk.Checkbutton(mod, text=label, variable=var, bg=BG_CARD, fg=TEXT_MAIN, activebackground=BG_CARD,
-                           font=("Segoe UI", 9), command=self._refresh_modular_ui).pack(anchor="w", pady=1)
+            mrow = tk.Frame(mod, bg=BG_CARD)
+            mrow.pack(fill="x", pady=2)
+            tk.Checkbutton(mrow, text=label, variable=var, bg=BG_CARD, fg=TEXT_MAIN, activebackground=BG_CARD,
+                           font=("Segoe UI", 9), command=self._refresh_modular_ui).pack(side="left")
+            badge = tk.Label(mrow, text="Chưa cài", font=("Segoe UI", 8, "bold"), bg=BG_SUBTLE, fg=TEXT_SUB, padx=7, pady=1)
+            badge.pack(side="right")
+            self.mod_badges[key] = badge
 
         # 7-Step Progress Stepper Card
         st_outer, st = self._card(left, pad=12)
@@ -317,9 +323,34 @@ class InstallerApp(tk.Tk):
             if self.env.existing_api_key:
                 self.use_existing_api_btn.pack(side="right")
                 self._append_log("Phát hiện OpenClaw đã có sẵn API key — khách có thể nhập key riêng hoặc bấm 'Lấy key sẵn từ OpenClaw'.")
+            self._refresh_installed_badges(prefill=True)
         else:
             self.det_badge.config(text="⚠️ Không tìm thấy OpenClaw trên máy", bg=BG_DANGER, fg=DANGER)
             self.det_meta.config(text="Vui lòng cài đặt OpenClaw trước khi chạy bộ cài tạo video này.")
+
+    def _refresh_installed_badges(self, prefill: bool = False):
+        if not self.env.found:
+            return
+        st = detect_installed_modules(self.env.state_dir)
+        for key, badge in self.mod_badges.items():
+            if st.get(key):
+                badge.config(text="✓ Đã cài", bg=BG_SUCCESS, fg=SUCCESS)
+            else:
+                badge.config(text="Chưa cài", bg=BG_SUBTLE, fg=TEXT_SUB)
+        if prefill:
+            cfg = st.get("social_cfg") or {}
+            gs = cfg.get("google_sheet") or {}
+            gd = cfg.get("google_drive") or {}
+            fb = cfg.get("facebook") or {}
+            yt = cfg.get("youtube") or {}
+            if gs.get("url") and not self.gs_url_var.get():
+                self.gs_url_var.set(gs["url"])
+            if gd.get("folder_url") and not self.gd_url_var.get():
+                self.gd_url_var.set(gd["folder_url"])
+            if fb.get("page_id") and not self.fb_id_var.get():
+                self.fb_id_var.set(fb["page_id"])
+            if yt.get("channel_url") and not self.yt_url_var.get():
+                self.yt_url_var.set(yt["channel_url"])
 
     def _load_existing_api(self):
         if self.env.existing_api_key:
@@ -462,6 +493,7 @@ class InstallerApp(tk.Tk):
             def finish():
                 self.installing = False
                 self.start_btn.config(state="normal", text="🚀 Bắt đầu cài đặt ngay")
+                self._refresh_installed_badges(prefill=False)
                 if ok:
                     messagebox.showinfo("Hoàn tất!", "Đã cài xong OpenClaw Video Factory!\n\nMở Telegram nhắn cho bot để tạo video 9:16 ngay.")
                 else:

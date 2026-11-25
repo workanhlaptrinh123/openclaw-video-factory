@@ -157,3 +157,31 @@ def verify_api_key(api_key: str, base_url: str = "https://codex.anhlaptrinh.vn/v
         return {"ok": True, "count": len(models), "models": models[:5]}
     except Exception as exc:
         return {"ok": False, "error": str(exc)}
+
+
+def detect_installed_modules(state_dir: str) -> dict:
+    """Check which of the 4 modules are already installed on this machine."""
+    status = {"video": False, "google": False, "facebook": False, "youtube": False, "social_cfg": {}}
+    if not state_dir:
+        return status
+    sd = Path(state_dir)
+    vf = sd / "video-factory"
+    if (vf / "make_reel.py").is_file() and (vf / ".venv" / "Scripts" / "python.exe").is_file():
+        status["video"] = True
+    soc_file = vf / "social_config.json"
+    if soc_file.is_file():
+        try:
+            cfg = json.loads(soc_file.read_text(encoding="utf-8-sig"))
+            status["social_cfg"] = cfg
+            gs = cfg.get("google_sheet") or {}
+            if (gs.get("sheet_id") or "").strip() or (vf / "secrets" / "googlesheetcn.json").is_file():
+                status["google"] = True
+            fb = cfg.get("facebook") or {}
+            if fb.get("enabled") and (fb.get("page_id") or "").strip():
+                status["facebook"] = True
+            yt = cfg.get("youtube") or {}
+            if yt.get("enabled") and ((yt.get("client_id") or "").strip() or (yt.get("channel_url") or "").strip()):
+                status["youtube"] = True
+        except Exception:
+            pass
+    return status
