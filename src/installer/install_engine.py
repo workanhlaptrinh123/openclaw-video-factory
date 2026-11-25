@@ -269,7 +269,7 @@ def run_install(
             on_log("  Đang cài edge-tts, Pillow, requests, python-dotenv, Google/YouTube API...")
             r = _run([
                 str(venv_py), "-m", "pip", "install", "--quiet",
-                "edge-tts", "Pillow", "requests", "python-dotenv",
+                "edge-tts", "gTTS", "Pillow", "requests", "python-dotenv",
                 "gspread", "google-auth", "google-api-python-client", "google-auth-oauthlib",
             ], timeout=360)
             if r.returncode != 0:

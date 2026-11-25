@@ -191,9 +191,36 @@ async def _synth_edge_once(text: str, voice: str, rate: str):
     return bytes(audio_chunks), cues
 
 
+def _estimate_sentence_cues(text: str, total_dur: float):
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?…])\s+", text.strip()) if s.strip()] or [text.strip()]
+    weights = [max(1, len(s.split())) for s in sentences]
+    total_w = sum(weights)
+    cursor, cues = 0.0, []
+    for idx, (sent, w) in enumerate(zip(sentences, weights)):
+        end = total_dur if idx == len(sentences) - 1 else round(cursor + total_dur * w / total_w, 3)
+        cues.append((round(cursor, 3), round(max(cursor + 0.1, end), 3), sent))
+        cursor = end
+    return cues
+
+
+def _synth_gtts_fallback(spoken: str, dest_mp3: Path):
+    from gtts import gTTS
+
+    raw_mp3 = dest_mp3.with_suffix(".gtts_raw.mp3")
+    gTTS(text=spoken, lang="vi", slow=False).save(str(raw_mp3))
+    ffmpeg = find_bin("ffmpeg")
+    # Speed up slightly (1.08x) and normalize to 24kHz mono 64k mp3 for crisp reel pacing
+    subprocess.run(
+        [ffmpeg, "-nostdin", "-hide_banner", "-v", "error", "-y", "-i", str(raw_mp3),
+         "-af", "atempo=1.08", "-ar", "24000", "-ac", "1", "-c:a", "libmp3lame", "-b:a", "64k", str(dest_mp3)],
+        check=True, timeout=60, stdin=subprocess.DEVNULL,
+    )
+    raw_mp3.unlink(missing_ok=True)
+
+
 def synth_scene_voice(text: str, voice: str, rate: str, rules, dest_mp3: Path, dest_srt: Path):
     spoken, spans = apply_pronunciation(text, rules)
-    cache_key = sha256_bytes(json.dumps(["edge-v1", text, spoken, voice, rate], sort_keys=True).encode("utf-8"))
+    cache_key = sha256_bytes(json.dumps(["tts-v2", text, spoken, voice, rate], sort_keys=True).encode("utf-8"))
     c_mp3 = CACHE_DIR / "tts" / f"{cache_key}.mp3"
     c_json = CACHE_DIR / "tts" / f"{cache_key}.json"
     c_mp3.parent.mkdir(parents=True, exist_ok=True)
@@ -203,34 +230,38 @@ def synth_scene_voice(text: str, voice: str, rate: str, rules, dest_mp3: Path, d
         shutil.copy2(c_mp3, dest_mp3)
         cues = [tuple(c) for c in meta["cues"]]
     else:
-        last_err = None
-        audio_bytes, raw_cues = None, None
-        for attempt in range(5):
+        audio_bytes, raw_cues, engine_used = None, None, "edge-tts"
+        alt_voice = "vi-VN-HoaiMyNeural" if voice == "vi-VN-NamMinhNeural" else "vi-VN-NamMinhNeural"
+        for try_voice in (voice, voice, alt_voice):
             try:
-                audio_bytes, raw_cues = asyncio.run(_synth_edge_once(spoken, voice, rate))
+                audio_bytes, raw_cues = asyncio.run(_synth_edge_once(spoken, try_voice, rate))
                 break
-            except Exception as exc:
-                last_err = exc
-                time.sleep(1.5 * (attempt + 1))
-        if audio_bytes is None:
-            raise RuntimeError(f"edge-tts failed after 5 attempts: {last_err}")
+            except Exception:
+                time.sleep(1.5)
 
-        c_mp3.write_bytes(audio_bytes)
-        dur = media_duration(c_mp3)
-        cues = []
-        cursor = 0
-        for a, b, frag in raw_cues:
-            shown, cursor = restore_display_text(text, spoken, spans, frag, cursor)
-            cues.append((round(a, 3), round(min(b, dur), 3), shown))
-        if not cues:
-            cues = [(0.0, round(dur, 3), text.strip())]
-        # Normalize minor overlaps
-        for i in range(len(cues) - 1):
-            a, b, t = cues[i]
-            na = cues[i + 1][0]
-            if b > na:
-                cues[i] = (a, max(a + 0.05, na), t)
-        meta = {"duration": dur, "cues": cues, "voice": voice, "rate": rate}
+        if audio_bytes is not None:
+            c_mp3.write_bytes(audio_bytes)
+            dur = media_duration(c_mp3)
+            cues = []
+            cursor = 0
+            for a, b, frag in (raw_cues or []):
+                shown, cursor = restore_display_text(text, spoken, spans, frag, cursor)
+                cues.append((round(a, 3), round(min(b, dur), 3), shown))
+            if not cues:
+                cues = _estimate_sentence_cues(text, dur)
+            for i in range(len(cues) - 1):
+                a, b, t = cues[i]
+                na = cues[i + 1][0]
+                if b > na:
+                    cues[i] = (a, max(a + 0.05, na), t)
+        else:
+            # Automatic fallback to gTTS (Vietnamese HTTPS — immune to Edge WebSocket drops)
+            engine_used = "gtts"
+            _synth_gtts_fallback(spoken, c_mp3)
+            dur = media_duration(c_mp3)
+            cues = _estimate_sentence_cues(text, dur)
+
+        meta = {"duration": dur, "cues": cues, "voice": voice, "rate": rate, "engine": engine_used}
         c_json.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
         shutil.copy2(c_mp3, dest_mp3)
 
