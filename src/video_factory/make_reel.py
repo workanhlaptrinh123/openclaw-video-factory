@@ -398,6 +398,10 @@ def build_reel(script_path: Path) -> dict:
         raise ValueError("Script must contain a non-empty 'scenes' list")
 
     slug = f"{job_id}-{version}"
+    if script.get("reuse_composition"):
+        import sys
+        from reuse_composition import render
+        return render(sys.modules[__name__], script, slug)
     ws = ROOT / "workspaces" / slug
     out_dir = ROOT / "output" / slug
     if ws.exists():
@@ -564,10 +568,19 @@ def build_reel(script_path: Path) -> dict:
     if dec.returncode != 0:
         raise RuntimeError(f"Full decode check failed: {dec.stderr[-300:]}")
 
-    # Step 6: Stage canonical copy in OpenClaw media/outbound for Telegram delivery
+    # Step 6: Stage Telegram-ready copy in OpenClaw media/outbound (auto-optimize if > 15 MB)
     OUTBOUND_DIR.mkdir(parents=True, exist_ok=True)
     outbound_mp4 = OUTBOUND_DIR / f"{slug}.mp4"
-    shutil.copy2(final_mp4, outbound_mp4)
+    if final_mp4.stat().st_size > 15 * 1024 * 1024:
+        subprocess.run(
+            [ffmpeg, "-nostdin", "-hide_banner", "-v", "error", "-y", "-i", str(final_mp4),
+             "-c:v", "libx264", "-preset", "medium", "-crf", "24",
+             "-maxrate", "3500k", "-bufsize", "7000k", "-pix_fmt", "yuv420p",
+             "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", str(outbound_mp4)],
+            check=True, timeout=300, stdin=subprocess.DEVNULL,
+        )
+    else:
+        shutil.copy2(final_mp4, outbound_mp4)
 
     result = {
         "ok": True,
