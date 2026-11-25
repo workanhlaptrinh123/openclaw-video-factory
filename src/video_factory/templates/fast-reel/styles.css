@@ -1,0 +1,131 @@
+@font-face {
+  font-family: "BeVietnamPro";
+  src: url("assets/regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: "BeVietnamPro";
+  src: url("assets/bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+}
+* {
+  box-sizing: border-box;
+}
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 1080px;
+  height: 1920px;
+  overflow: hidden;
+  background: #020612;
+  color: #ffffff;
+  font-family: "BeVietnamPro", "Segoe UI", Arial, sans-serif;
+}
+#root {
+  position: relative;
+  width: 1080px;
+  height: 1920px;
+  overflow: hidden;
+  isolation: isolate;
+  background: #020612;
+}
+.clip {
+  position: absolute;
+}
+video.background {
+  inset: 0;
+  width: 1080px;
+  height: 1920px;
+  object-fit: cover;
+  z-index: 1;
+}
+.scrim-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 520px;
+  background: linear-gradient(180deg, rgba(2, 8, 20, 0.72) 0%, rgba(2, 8, 20, 0.28) 55%, rgba(2, 8, 20, 0) 100%);
+  z-index: 2;
+  pointer-events: none;
+}
+.scrim-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 540px;
+  background: linear-gradient(0deg, rgba(2, 8, 20, 0.86) 0%, rgba(2, 8, 20, 0.42) 55%, rgba(2, 8, 20, 0) 100%);
+  z-index: 2;
+  pointer-events: none;
+}
+#hook {
+  position: absolute;
+  left: 72px;
+  right: 72px;
+  top: 230px;
+  margin: 0;
+  padding: 26px 34px;
+  border-radius: 28px;
+  background: rgba(4, 14, 34, 0.78);
+  border: 2px solid rgba(112, 239, 255, 0.45);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+  color: #ffffff;
+  font-size: 62px;
+  font-weight: 700;
+  line-height: 1.22;
+  text-align: center;
+  text-shadow: 0 4px 18px rgba(0, 0, 0, 0.7);
+  z-index: 10;
+}
+.subtitle {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 135px;
+  max-width: 940px;
+  width: max-content;
+  padding: 18px 34px;
+  border-radius: 999px;
+  background: rgba(2, 10, 22, 0.84);
+  border: 1.5px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  color: #ffffff;
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1.32;
+  text-align: center;
+  z-index: 20;
+}
+.image-credit {
+  position: absolute;
+  left: 80px;
+  right: 80px;
+  bottom: 58px;
+  margin: 0;
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1.3;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.78);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.85);
+  z-index: 15;
+}
+.progress-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  z-index: 30;
+}
+.progress-bar {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #0ed4e7, #ffd84d, #8f5cff);
+  transform: scaleX(0);
+  transform-origin: left center;
+}

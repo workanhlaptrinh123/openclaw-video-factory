@@ -1,0 +1,12 @@
+{
+  "version": "2026-11-25",
+  "rules": [
+    { "written": "A.I.", "spoken": "ây ai" },
+    { "written": "AI", "spoken": "ây ai" },
+    { "written": "ChatGPT", "spoken": "Chát Gi Pi Ti" },
+    { "written": "OpenClaw", "spoken": "Ô pần Clo" },
+    { "written": "API", "spoken": "ây pi ai" },
+    { "written": "CEO", "spoken": "xi i ô" },
+    { "written": "KPI", "spoken": "kây pi ai" }
+  ]
+}

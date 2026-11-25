@@ -1,0 +1,19 @@
+# Python / build artifacts
+__pycache__/
+*.pyc
+.venv/
+.build-venv/
+build/
+dist/
+*.spec
+
+# Secrets & runtime data (NEVER commit)
+*.token
+*.secret
+.env
+openclaw.json
+workspaces/
+output/
+scripts_in/
+.cache/
+node_modules/

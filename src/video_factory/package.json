@@ -1,0 +1,14 @@
+﻿{
+  "name": "openclaw-video-factory",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "hyperframes dev",
+    "check": "hyperframes lint && hyperframes validate && hyperframes inspect",
+    "render": "hyperframes render ."
+  },
+  "dependencies": {
+    "hyperframes": "0.8.78",
+    "gsap": "^3.12.5"
+  }
+}
