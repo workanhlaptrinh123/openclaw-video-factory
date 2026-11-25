@@ -13,16 +13,19 @@ $vpy = "$root\.build-venv\Scripts\python.exe"
 & $vpy -m pip install --upgrade pip --quiet
 & $vpy -m pip install pyinstaller --quiet
 
+$ver = "v" + (Get-Date -Format "dd.MM.yyyy")
+$exeName = "OpenClaw-VideoFactory-Setup-$ver"
+
 & $vpy -m PyInstaller `
   --noconfirm `
   --clean `
   --onefile `
   --windowed `
-  --name "OpenClaw-VideoFactory-Setup" `
+  --name $exeName `
   --paths "src\installer" `
   --add-data "src\video_factory;src\video_factory" `
   --add-data "src\skill;src\skill" `
   "src\installer\app_gui.py"
 
-Write-Host "`nBUILD SUCCESS:" -ForegroundColor Green
-Get-Item "$root\dist\OpenClaw-VideoFactory-Setup.exe" | Select-Object FullName, Length
+Write-Host "`nBUILD SUCCESS ($ver):" -ForegroundColor Green
+Get-Item "$root\dist\$exeName.exe" | Select-Object FullName, Length

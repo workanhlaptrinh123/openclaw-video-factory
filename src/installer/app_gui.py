@@ -28,10 +28,12 @@ ICONS = {
 }
 
 
+APP_VERSION = "v25.11.2026"
+
 class InstallerApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("OpenClaw Video Factory — Cài đặt Tạo Video 9:16")
+        self.title(f"OpenClaw Video Factory {APP_VERSION} — Cài đặt Tạo Video 9:16")
         self.geometry("860x760")
         self.minsize(780, 680)
         self.configure(bg=BG)

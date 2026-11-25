@@ -24,14 +24,28 @@ jobs:
       - name: Install PyInstaller
         run: python -m pip install --upgrade pip pyinstaller
 
-      - name: Build OpenClaw-VideoFactory-Setup.exe
+      - name: Determine Version (dd.MM.yyyy)
+        id: ver
+        shell: pwsh
         run: |
+          if ("${{ github.ref }}".StartsWith("refs/tags/")) {
+            $v = "${{ github.ref_name }}"
+          } else {
+            $v = "v" + (Get-Date -Format "dd.MM.yyyy")
+          }
+          "VERSION=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "Build version: $v"
+
+      - name: Build OpenClaw-VideoFactory-Setup.exe
+        shell: pwsh
+        run: |
+          $v = "${{ steps.ver.outputs.VERSION }}"
           python -m PyInstaller `
             --noconfirm `
             --clean `
             --onefile `
             --windowed `
-            --name "OpenClaw-VideoFactory-Setup" `
+            --name "OpenClaw-VideoFactory-Setup-$v" `
             --paths "src\installer" `
             --add-data "src\video_factory;src\video_factory" `
             --add-data "src\skill;src\skill" `
@@ -40,11 +54,11 @@ jobs:
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
         with:
-          name: OpenClaw-VideoFactory-Setup
-          path: dist/OpenClaw-VideoFactory-Setup.exe
+          name: OpenClaw-VideoFactory-Setup-${{ steps.ver.outputs.VERSION }}
+          path: dist/OpenClaw-VideoFactory-Setup-*.exe
 
       - name: Attach to GitHub Release (on tag)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/OpenClaw-VideoFactory-Setup.exe
+          files: dist/OpenClaw-VideoFactory-Setup-*.exe

@@ -25,7 +25,7 @@ git branch -M main
 git remote add origin https://github.com/<tai-khoan>/<ten-repo>.git
 git push -u origin main
 
-# Tạo bản phát hành .exe tự động trên GitHub Actions:
-git tag v1.0.0
-git push origin v1.0.0
+# Tạo bản phát hành .exe tự động theo định dạng ngày.tháng.năm (vDD.MM.YYYY):
+git tag v25.11.2026
+git push origin v25.11.2026
 ```
