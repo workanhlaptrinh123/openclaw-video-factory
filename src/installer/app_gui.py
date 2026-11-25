@@ -35,6 +35,7 @@ STEP_BADGES = {
     "running": ("▶", PRIMARY, PRIMARY, "Đang chạy..."),
     "healing": ("🛠", WARN, WARN, "Codex đang tự sửa..."),
     "done": ("✓", SUCCESS, SUCCESS, "Hoàn tất"),
+    "skipped": ("⏭", TEXT_SUB, TEXT_SUB, "Bỏ qua"),
     "error": ("✕", DANGER, DANGER, "Gặp lỗi"),
 }
 
@@ -104,16 +105,33 @@ class InstallerApp(tk.Tk):
         left.grid(row=0, column=0, sticky="nsew", padx=(0, 14))
 
         # OpenClaw Detection Card
-        det_outer, det = self._card(left, pad=14)
-        det_outer.pack(fill="x", pady=(0, 12))
+        det_outer, det = self._card(left, pad=12)
+        det_outer.pack(fill="x", pady=(0, 10))
         tk.Label(det, text="Trạng thái OpenClaw trên máy", font=("Segoe UI", 10, "bold"), bg=BG_CARD, fg=TEXT_MAIN).pack(anchor="w")
         self.det_badge = tk.Label(det, text="Đang kiểm tra...", font=("Segoe UI", 9, "bold"), bg=BG_INFO, fg=PRIMARY, padx=8, pady=4, anchor="w", justify="left", wraplength=260)
-        self.det_badge.pack(fill="x", pady=(8, 4))
+        self.det_badge.pack(fill="x", pady=(6, 4))
         self.det_meta = tk.Label(det, text="", font=("Segoe UI", 8.5), bg=BG_CARD, fg=TEXT_SUB, anchor="w", justify="left", wraplength=260)
         self.det_meta.pack(fill="x")
 
+        # Modular Selection Card (Cài từng phần)
+        mod_outer, mod = self._card(left, pad=12)
+        mod_outer.pack(fill="x", pady=(0, 10))
+        tk.Label(mod, text="Chọn phần muốn cài (Cài từng phần)", font=("Segoe UI", 10, "bold"), bg=BG_CARD, fg=TEXT_MAIN).pack(anchor="w", pady=(0, 4))
+        self.mod_video_var = tk.BooleanVar(value=True)
+        self.mod_google_var = tk.BooleanVar(value=False)
+        self.mod_fb_var = tk.BooleanVar(value=False)
+        self.mod_yt_var = tk.BooleanVar(value=False)
+        for var, label in [
+            (self.mod_video_var, "🎬 Tạo Video 9:16 (Lõi chính)"),
+            (self.mod_google_var, "📊 Google Sheet & Drive (tuỳ chọn)"),
+            (self.mod_fb_var, "📘 Tự động đăng Facebook (tuỳ chọn)"),
+            (self.mod_yt_var, "▶️ Tự động đăng YouTube (tuỳ chọn)"),
+        ]:
+            tk.Checkbutton(mod, text=label, variable=var, bg=BG_CARD, fg=TEXT_MAIN, activebackground=BG_CARD,
+                           font=("Segoe UI", 9), command=self._refresh_modular_ui).pack(anchor="w", pady=1)
+
         # 7-Step Progress Stepper Card
-        st_outer, st = self._card(left, pad=14)
+        st_outer, st = self._card(left, pad=12)
         st_outer.pack(fill="both", expand=True)
         tk.Label(st, text="Tiến độ cài đặt (7 bước)", font=("Segoe UI", 10, "bold"), bg=BG_CARD, fg=TEXT_MAIN).pack(anchor="w")
         self.pct_lbl = tk.Label(st, text="0 / 7 bước hoàn tất", font=("Segoe UI", 8.5), bg=BG_CARD, fg=TEXT_SUB)
@@ -208,49 +226,56 @@ class InstallerApp(tk.Tk):
             font=("Segoe UI", 9, "bold"),
         ).pack(anchor="w")
 
-        # --- TAB 2: Tự động đăng bài (Google / Facebook / YouTube) ---
-        t2 = tk.Frame(nb, bg=BG_CARD, padx=18, pady=14)
-        nb.add(t2, text="  2. Tự động đăng bài (Google / FB / YT)  ")
-        t2.columnconfigure(1, weight=1)
+        # --- TAB 2: Tự động đăng bài (chỉ hiện các phần đã tích chọn bên trái) ---
+        t2 = tk.Frame(nb, bg=BG_CARD, padx=18, pady=12)
+        nb.add(t2, text="  2. Tự động đăng bài (Tuỳ chọn)  ")
 
-        tk.Label(t2, text="Link Google Sheet (sổ duyệt):", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 9)).grid(row=0, column=0, sticky="w", pady=3)
+        self.soc_empty_lbl = tk.Label(
+            t2,
+            text="Khách chưa chọn module đăng bài nào (Google Sheet / Facebook / YouTube).\n\nTích chọn ở mục 'Chọn phần muốn cài' bên cột trái nếu muốn cấu hình thêm kênh đăng bài, hoặc bỏ qua nếu chỉ cần chức năng Tạo Video 9:16.",
+            font=("Segoe UI", 9.5), bg=BG_SUBTLE, fg=TEXT_SUB, padx=16, pady=24, justify="left", wraplength=600,
+        )
+
+        # Google Section Frame
+        self.google_frame = tk.LabelFrame(t2, text=" Google Sheet & Google Drive ", bg=BG_CARD, fg=PRIMARY, font=("Segoe UI", 9, "bold"), padx=10, pady=6)
+        self.google_frame.columnconfigure(1, weight=1)
+        tk.Label(self.google_frame, text="Link Google Sheet:", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 9)).grid(row=0, column=0, sticky="w", pady=2)
         self.gs_url_var = tk.StringVar()
-        w, _ = self._entry(t2, self.gs_url_var)
-        w.grid(row=0, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=3)
-
-        tk.Label(t2, text="File Google Service Key (.json):", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 9)).grid(row=1, column=0, sticky="w", pady=3)
+        w, _ = self._entry(self.google_frame, self.gs_url_var)
+        w.grid(row=0, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=2)
+        tk.Label(self.google_frame, text="File Google Key (.json):", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 9)).grid(row=1, column=0, sticky="w", pady=2)
         self.gs_cred_var = tk.StringVar()
-        w, _ = self._entry(t2, self.gs_cred_var)
-        w.grid(row=1, column=1, sticky="ew", padx=8, pady=3)
-        tk.Button(t2, text="Chọn file...", command=self._pick_google_json, bg=BG_SUBTLE, fg=TEXT_MAIN, relief="solid", bd=1, font=("Segoe UI", 8.5), padx=10, pady=4, cursor="hand2").grid(row=1, column=2, pady=3)
-
-        tk.Label(t2, text="Link Google Drive (tuỳ chọn):", bg=BG_CARD, fg=TEXT_SUB, font=("Segoe UI", 9)).grid(row=2, column=0, sticky="w", pady=3)
+        w, _ = self._entry(self.google_frame, self.gs_cred_var)
+        w.grid(row=1, column=1, sticky="ew", padx=8, pady=2)
+        tk.Button(self.google_frame, text="Chọn file...", command=self._pick_google_json, bg=BG_SUBTLE, fg=TEXT_MAIN, relief="solid", bd=1, font=("Segoe UI", 8.5), padx=10, pady=3, cursor="hand2").grid(row=1, column=2, pady=2)
+        tk.Label(self.google_frame, text="Link Google Drive:", bg=BG_CARD, fg=TEXT_SUB, font=("Segoe UI", 9)).grid(row=2, column=0, sticky="w", pady=2)
         self.gd_url_var = tk.StringVar()
-        w, _ = self._entry(t2, self.gd_url_var)
-        w.grid(row=2, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=3)
+        w, _ = self._entry(self.google_frame, self.gd_url_var)
+        w.grid(row=2, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=2)
 
-        tk.Label(t2, text="Facebook Page ID:", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 9)).grid(row=3, column=0, sticky="w", pady=3)
+        # Facebook Section Frame
+        self.fb_frame = tk.LabelFrame(t2, text=" Facebook Fanpage ", bg=BG_CARD, fg=PRIMARY, font=("Segoe UI", 9, "bold"), padx=10, pady=6)
+        self.fb_frame.columnconfigure(1, weight=1)
+        tk.Label(self.fb_frame, text="Facebook Page ID:", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 9)).grid(row=0, column=0, sticky="w", pady=2)
         self.fb_id_var = tk.StringVar()
-        w, _ = self._entry(t2, self.fb_id_var)
-        w.grid(row=3, column=1, sticky="ew", padx=8, pady=3)
-        self.fb_en_var = tk.BooleanVar(value=False)
-        tk.Checkbutton(t2, text="Bật đăng FB", variable=self.fb_en_var, bg=BG_CARD, fg=PRIMARY, font=("Segoe UI", 9, "bold")).grid(row=3, column=2, sticky="w")
-
-        tk.Label(t2, text="Facebook Page Access Token:", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 9)).grid(row=4, column=0, sticky="w", pady=3)
+        w, _ = self._entry(self.fb_frame, self.fb_id_var)
+        w.grid(row=0, column=1, sticky="ew", padx=(8, 0), pady=2)
+        tk.Label(self.fb_frame, text="Page Access Token:", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 9)).grid(row=1, column=0, sticky="w", pady=2)
         self.fb_tok_var = tk.StringVar()
-        w, _ = self._entry(t2, self.fb_tok_var, show="*")
-        w.grid(row=4, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=3)
+        w, _ = self._entry(self.fb_frame, self.fb_tok_var, show="*")
+        w.grid(row=1, column=1, sticky="ew", padx=(8, 0), pady=2)
+        self.fb_en_var = self.mod_fb_var
 
-        tk.Label(t2, text="Link kênh YouTube:", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 9)).grid(row=5, column=0, sticky="w", pady=3)
+        # YouTube Section Frame
+        self.yt_frame = tk.LabelFrame(t2, text=" YouTube Shorts ", bg=BG_CARD, fg=PRIMARY, font=("Segoe UI", 9, "bold"), padx=10, pady=6)
+        self.yt_frame.columnconfigure(1, weight=1)
+        tk.Label(self.yt_frame, text="Link kênh YouTube:", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 9)).grid(row=0, column=0, sticky="w", pady=2)
         self.yt_url_var = tk.StringVar()
-        w, _ = self._entry(t2, self.yt_url_var)
-        w.grid(row=5, column=1, sticky="ew", padx=8, pady=3)
-        self.yt_en_var = tk.BooleanVar(value=False)
-        tk.Checkbutton(t2, text="Bật đăng YT", variable=self.yt_en_var, bg=BG_CARD, fg=PRIMARY, font=("Segoe UI", 9, "bold")).grid(row=5, column=2, sticky="w")
-
-        tk.Label(t2, text="YouTube Client ID / Secret:", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 9)).grid(row=6, column=0, sticky="w", pady=3)
-        yt_box = tk.Frame(t2, bg=BG_CARD)
-        yt_box.grid(row=6, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=3)
+        w, _ = self._entry(self.yt_frame, self.yt_url_var)
+        w.grid(row=0, column=1, sticky="ew", padx=(8, 0), pady=2)
+        tk.Label(self.yt_frame, text="Client ID / Secret:", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 9)).grid(row=1, column=0, sticky="w", pady=2)
+        yt_box = tk.Frame(self.yt_frame, bg=BG_CARD)
+        yt_box.grid(row=1, column=1, sticky="ew", padx=(8, 0), pady=2)
         yt_box.columnconfigure(0, weight=1)
         yt_box.columnconfigure(1, weight=1)
         self.yt_cid_var = tk.StringVar()
@@ -259,6 +284,9 @@ class InstallerApp(tk.Tk):
         w2, _ = self._entry(yt_box, self.yt_csec_var, show="*")
         w1.grid(row=0, column=0, sticky="ew", padx=(0, 6))
         w2.grid(row=0, column=1, sticky="ew")
+        self.yt_en_var = self.mod_yt_var
+
+        self._refresh_modular_ui()
 
         # Action Bar
         act = tk.Frame(right, bg=BG_CANVAS, pady=10)
@@ -307,6 +335,22 @@ class InstallerApp(tk.Tk):
         p = filedialog.askopenfilename(title="Chọn file Google Service Account JSON", filetypes=[("JSON files", "*.json"), ("All files", "*.*")])
         if p:
             self.gs_cred_var.set(p)
+
+    def _refresh_modular_ui(self):
+        for f in (self.soc_empty_lbl, self.google_frame, self.fb_frame, self.yt_frame):
+            f.pack_forget()
+        any_soc = False
+        if self.mod_google_var.get():
+            self.google_frame.pack(fill="x", pady=(0, 6))
+            any_soc = True
+        if self.mod_fb_var.get():
+            self.fb_frame.pack(fill="x", pady=(0, 6))
+            any_soc = True
+        if self.mod_yt_var.get():
+            self.yt_frame.pack(fill="x", pady=(0, 6))
+            any_soc = True
+        if not any_soc:
+            self.soc_empty_lbl.pack(fill="x", pady=10)
 
     def _toggle_mode(self):
         state = "normal" if self.mode_var.get() == "separate_bot" else "disabled"
@@ -372,11 +416,14 @@ class InstallerApp(tk.Tk):
         if not self.env.found:
             messagebox.showerror("Không thấy OpenClaw", "Không tìm thấy OpenClaw đang cài trên máy này.")
             return
+        if not any([self.mod_video_var.get(), self.mod_google_var.get(), self.mod_fb_var.get(), self.mod_yt_var.get()]):
+            messagebox.showwarning("Chưa chọn module", "Vui lòng tích chọn ít nhất 1 phần muốn cài ở cột bên trái.")
+            return
         mode = self.mode_var.get()
-        if mode == "separate_bot" and not self.token_var.get().strip():
+        if self.mod_video_var.get() and mode == "separate_bot" and not self.token_var.get().strip():
             messagebox.showwarning("Thiếu Bot Token", "Vui lòng nhập Telegram Bot Token (hoặc chọn 'Gắn vào Bot hiện có').")
             return
-        if not self.api_var.get().strip():
+        if self.mod_video_var.get() and not self.api_var.get().strip():
             messagebox.showwarning("Thiếu API Key", "Vui lòng nhập API Key cá nhân (hoặc bấm 'Lấy key sẵn từ OpenClaw').")
             return
 
@@ -394,16 +441,20 @@ class InstallerApp(tk.Tk):
             api_key=self.api_var.get().strip(),
             pexels_key=self.pexels_var.get().strip(),
             enable_codex_heal=self.heal_var.get(),
+            install_video_core=self.mod_video_var.get(),
+            install_google=self.mod_google_var.get(),
+            install_facebook=self.mod_fb_var.get(),
+            install_youtube=self.mod_yt_var.get(),
             google_sheet_url=self.gs_url_var.get().strip(),
             google_cred_json=self.gs_cred_var.get().strip(),
             google_drive_url=self.gd_url_var.get().strip(),
             fb_page_id=self.fb_id_var.get().strip(),
             fb_page_token=self.fb_tok_var.get().strip(),
-            fb_enabled=self.fb_en_var.get(),
+            fb_enabled=self.mod_fb_var.get(),
             yt_channel_url=self.yt_url_var.get().strip(),
             yt_client_id=self.yt_cid_var.get().strip(),
             yt_client_secret=self.yt_csec_var.get().strip(),
-            yt_enabled=self.yt_en_var.get(),
+            yt_enabled=self.mod_yt_var.get(),
         )
 
         def worker():

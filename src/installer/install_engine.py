@@ -35,6 +35,11 @@ class InstallOptions:
     api_key: str = ""
     pexels_key: str = ""
     enable_codex_heal: bool = True
+    # Modular selection flags (Cài từng phần)
+    install_video_core: bool = True
+    install_google: bool = False
+    install_facebook: bool = False
+    install_youtube: bool = False
     # Auto-publish channels (Google Sheet / Drive / Facebook / YouTube)
     google_sheet_url: str = ""
     google_cred_json: str = ""
@@ -136,10 +141,19 @@ def run_install(
     try:
         # Step 1: Verify OpenClaw & backup
         def s1():
+            if not any([opts.install_video_core, opts.install_google, opts.install_facebook, opts.install_youtube]):
+                raise RuntimeError("Vui lòng tích chọn ít nhất 1 module để cài đặt.")
             if not opts.env.found or not Path(opts.env.config_path).is_file():
                 raise RuntimeError("Không tìm thấy OpenClaw trên máy này. Vui lòng cài OpenClaw trước.")
-            if opts.mode == "separate_bot" and not opts.bot_token.strip():
+            if opts.install_video_core and opts.mode == "separate_bot" and not opts.bot_token.strip():
                 raise RuntimeError("Chế độ Bot riêng yêu cầu nhập Telegram Bot Token.")
+            mods = [name for flag, name in [
+                (opts.install_video_core, "Tạo Video 9:16"),
+                (opts.install_google, "Google Sheet/Drive"),
+                (opts.install_facebook, "Facebook Fanpage"),
+                (opts.install_youtube, "YouTube Shorts"),
+            ] if flag]
+            on_log(f"  Module đã chọn: {', '.join(mods)}")
             on_log(f"  OpenClaw state: {sd}")
             on_log(f"  OpenClaw CLI:   {opts.env.openclaw_cmd}")
             on_log(f"  Codex CLI:      {opts.env.codex_cmd or '(dùng Codex API dự phòng)'}")
@@ -161,84 +175,97 @@ def run_install(
             py_exe["path"] = py
             on_log(f"  Python: {py}")
 
-            node = shutil.which("node")
-            if not node:
-                raise RuntimeError("Không tìm thấy Node.js trên PATH.")
-            on_log(f"  Node:   {node}")
+            if opts.install_video_core:
+                node = shutil.which("node")
+                if not node:
+                    raise RuntimeError("Không tìm thấy Node.js trên PATH.")
+                on_log(f"  Node:   {node}")
 
-            ffmpeg = shutil.which("ffmpeg")
-            if not ffmpeg:
-                on_log("  Không thấy FFmpeg — đang cài tự động qua winget...")
-                r = _run(["winget", "install", "-e", "--id", "Gyan.FFmpeg",
-                          "--accept-package-agreements", "--accept-source-agreements"], timeout=300)
-                if r.returncode != 0:
-                    raise RuntimeError("Không cài được FFmpeg: " + (r.stderr or r.stdout)[-300:])
-            else:
-                on_log(f"  FFmpeg: {ffmpeg}")
+                ffmpeg = shutil.which("ffmpeg")
+                if not ffmpeg:
+                    on_log("  Không thấy FFmpeg — đang cài tự động qua winget...")
+                    r = _run(["winget", "install", "-e", "--id", "Gyan.FFmpeg",
+                              "--accept-package-agreements", "--accept-source-agreements"], timeout=300)
+                    if r.returncode != 0:
+                        raise RuntimeError("Không cài được FFmpeg: " + (r.stderr or r.stdout)[-300:])
+                else:
+                    on_log(f"  FFmpeg: {ffmpeg}")
 
         exec_with_heal(1, s2)
 
-        # Step 3: Copy video-factory core + parameterized skills
+        # Step 3: Copy selected core/social files + parameterized skills
         def s3():
             src_vf = bundle_root() / "src" / "video_factory"
             src_skill = bundle_root() / "src" / "skill"
             for sub in ("config", "assets/fonts", "templates/fast-reel", "scripts_in", "workspaces", "output", "secrets"):
                 (vf_dir / sub).mkdir(parents=True, exist_ok=True)
-            for rel in (
-                "make_reel.py",
-                "publish_social.py",
-                "package.json",
-                "config/pronunciation.json",
-                "assets/fonts/BeVietnamPro-Regular.ttf",
-                "assets/fonts/BeVietnamPro-Bold.ttf",
-                "templates/fast-reel/index.template.html",
-                "templates/fast-reel/styles.css",
-            ):
-                shutil.copy2(src_vf / rel, vf_dir / rel)
 
-            # Copy Google Service Account JSON if provided
-            cred_dst = vf_dir / "secrets" / "googlesheetcn.json"
-            if opts.google_cred_json.strip() and Path(opts.google_cred_json.strip()).is_file():
-                shutil.copy2(Path(opts.google_cred_json.strip()), cred_dst)
+            if opts.install_video_core:
+                for rel in (
+                    "make_reel.py",
+                    "package.json",
+                    "config/pronunciation.json",
+                    "assets/fonts/BeVietnamPro-Regular.ttf",
+                    "assets/fonts/BeVietnamPro-Bold.ttf",
+                    "templates/fast-reel/index.template.html",
+                    "templates/fast-reel/styles.css",
+                ):
+                    shutil.copy2(src_vf / rel, vf_dir / rel)
 
-            # Write social_config.json (Google Sheet / Drive / Facebook / YouTube)
-            social_cfg = {
-                "google_sheet": {
+            if opts.install_google or opts.install_facebook or opts.install_youtube:
+                shutil.copy2(src_vf / "publish_social.py", vf_dir / "publish_social.py")
+
+            # Merge into existing social_config.json so previously configured channels are preserved
+            soc_path = vf_dir / "social_config.json"
+            social_cfg = json.loads(soc_path.read_text(encoding="utf-8-sig")) if soc_path.is_file() else {}
+
+            if opts.install_google:
+                cred_dst = vf_dir / "secrets" / "googlesheetcn.json"
+                if opts.google_cred_json.strip() and Path(opts.google_cred_json.strip()).is_file():
+                    shutil.copy2(Path(opts.google_cred_json.strip()), cred_dst)
+                social_cfg["google_sheet"] = {
                     "url": opts.google_sheet_url.strip(),
                     "sheet_id": extract_sheet_id(opts.google_sheet_url),
                     "tab": "aid_video",
                     "credentials_file": str(cred_dst),
-                },
-                "google_drive": {
-                    "folder_url": opts.google_drive_url.strip(),
-                },
-                "facebook": {
-                    "enabled": bool(opts.fb_enabled),
+                }
+                social_cfg["google_drive"] = {"folder_url": opts.google_drive_url.strip()}
+                on_log("  Đã lưu cấu hình Google Sheet / Drive.")
+
+            if opts.install_facebook:
+                social_cfg["facebook"] = {
+                    "enabled": True,
                     "page_id": opts.fb_page_id.strip(),
                     "page_access_token": opts.fb_page_token.strip(),
-                },
-                "youtube": {
-                    "enabled": bool(opts.yt_enabled),
+                }
+                on_log("  Đã lưu cấu hình tự động đăng Facebook Fanpage.")
+
+            if opts.install_youtube:
+                social_cfg["youtube"] = {
+                    "enabled": True,
                     "channel_url": opts.yt_channel_url.strip(),
                     "client_id": opts.yt_client_id.strip(),
                     "client_secret": opts.yt_client_secret.strip(),
-                },
-            }
-            (vf_dir / "social_config.json").write_text(json.dumps(social_cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                }
+                on_log("  Đã lưu cấu hình tự động đăng YouTube Shorts.")
+
+            if social_cfg:
+                soc_path.write_text(json.dumps(social_cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
             # Write .env if Pexels or Codex key provided
-            env_lines = []
-            if opts.api_key.strip():
-                env_lines.append(f"TOKEN_CODEX_API_KEY={opts.api_key.strip()}")
-                subprocess.run(
-                    ["powershell", "-NoLogo", "-NoProfile", "-Command",
-                     f"[Environment]::SetEnvironmentVariable('TOKEN_CODEX_API_KEY', '{opts.api_key.strip()}', 'User')"],
-                    capture_output=True, timeout=20, stdin=subprocess.DEVNULL,
-                )
-            if opts.pexels_key.strip():
-                env_lines.append(f"PEXELS_API_KEY={opts.pexels_key.strip()}")
-            if env_lines:
-                (vf_dir / ".env").write_text("\n".join(env_lines) + "\n", encoding="utf-8")
+            if opts.install_video_core:
+                env_lines = []
+                if opts.api_key.strip():
+                    env_lines.append(f"TOKEN_CODEX_API_KEY={opts.api_key.strip()}")
+                    subprocess.run(
+                        ["powershell", "-NoLogo", "-NoProfile", "-Command",
+                         f"[Environment]::SetEnvironmentVariable('TOKEN_CODEX_API_KEY', '{opts.api_key.strip()}', 'User')"],
+                        capture_output=True, timeout=20, stdin=subprocess.DEVNULL,
+                    )
+                if opts.pexels_key.strip():
+                    env_lines.append(f"PEXELS_API_KEY={opts.pexels_key.strip()}")
+                if env_lines:
+                    (vf_dir / ".env").write_text("\n".join(env_lines) + "\n", encoding="utf-8")
 
             def render_tpl(src_file: Path, dst_file: Path):
                 txt = src_file.read_text(encoding="utf-8")
@@ -246,19 +273,18 @@ def run_install(
                 dst_file.parent.mkdir(parents=True, exist_ok=True)
                 dst_file.write_text(txt, encoding="utf-8")
 
-            # Install skill to main workspace
             render_tpl(src_skill / "SKILL.md", sd / "workspace" / "skills" / "tao-video-reel" / "SKILL.md")
-            # Install workspace-video for separate_bot mode
-            if opts.mode == "separate_bot":
-                ws_vid = sd / "workspace-video"
+            ws_vid = sd / "workspace-video"
+            if opts.mode == "separate_bot" or ws_vid.is_dir():
                 render_tpl(src_skill / "SKILL.md", ws_vid / "skills" / "tao-video-reel" / "SKILL.md")
-                render_tpl(src_skill / "AGENTS.md", ws_vid / "AGENTS.md")
-                render_tpl(src_skill / "IDENTITY.md", ws_vid / "IDENTITY.md")
-            on_log(f"  Đã chép Video Factory & Skill vào {vf_dir}")
+                if opts.install_video_core:
+                    render_tpl(src_skill / "AGENTS.md", ws_vid / "AGENTS.md")
+                    render_tpl(src_skill / "IDENTITY.md", ws_vid / "IDENTITY.md")
+            on_log(f"  Đã cập nhật file & Skill tại {vf_dir}")
 
         exec_with_heal(2, s3)
 
-        # Step 4: Python venv + npm install hyperframes
+        # Step 4: Selective Python venv packages + npm install hyperframes (only if needed)
         def s4():
             venv_py = vf_dir / ".venv" / "Scripts" / "python.exe"
             if not venv_py.is_file():
@@ -266,82 +292,96 @@ def run_install(
                 r = _run([py_exe["path"], "-m", "venv", str(vf_dir / ".venv")], timeout=120)
                 if r.returncode != 0:
                     raise RuntimeError("Tạo venv thất bại: " + (r.stderr or r.stdout)[-300:])
-            on_log("  Đang cài edge-tts, Pillow, requests, python-dotenv, Google/YouTube API...")
-            r = _run([
-                str(venv_py), "-m", "pip", "install", "--quiet",
-                "edge-tts", "gTTS", "Pillow", "requests", "python-dotenv",
-                "gspread", "google-auth", "google-api-python-client", "google-auth-oauthlib",
-            ], timeout=360)
+
+            pkgs = ["requests", "python-dotenv"]
+            if opts.install_video_core:
+                pkgs += ["edge-tts", "gTTS", "Pillow"]
+            if opts.install_google:
+                pkgs += ["gspread", "google-auth"]
+            if opts.install_youtube:
+                pkgs += ["google-api-python-client", "google-auth-oauthlib"]
+            pkgs = list(dict.fromkeys(pkgs))
+            on_log(f"  Đang cài gói Python cho các module đã chọn: {', '.join(pkgs)}...")
+            r = _run([str(venv_py), "-m", "pip", "install", "--quiet", *pkgs], timeout=360)
             if r.returncode != 0:
                 raise RuntimeError("pip install thất bại: " + (r.stderr or r.stdout)[-300:])
 
-            npm_cmd = shutil.which("npm.cmd") or shutil.which("npm")
-            if not npm_cmd:
-                raise RuntimeError("Không tìm thấy npm trên PATH.")
-            on_log("  Đang cài hyperframes & gsap (npm install)...")
-            r = _run([npm_cmd, "install", "--no-audit", "--no-fund"], cwd=vf_dir, timeout=420)
-            if r.returncode != 0:
-                raise RuntimeError("npm install thất bại: " + (r.stderr or r.stdout)[-300:])
+            if opts.install_video_core:
+                npm_cmd = shutil.which("npm.cmd") or shutil.which("npm")
+                if not npm_cmd:
+                    raise RuntimeError("Không tìm thấy npm trên PATH.")
+                on_log("  Đang cài hyperframes & gsap (npm install)...")
+                r = _run([npm_cmd, "install", "--no-audit", "--no-fund"], cwd=vf_dir, timeout=420)
+                if r.returncode != 0:
+                    raise RuntimeError("npm install thất bại: " + (r.stderr or r.stdout)[-300:])
+            else:
+                on_log("  Bỏ qua npm install (chỉ cài bổ sung module đăng bài).")
 
         exec_with_heal(3, s4)
 
-        # Step 5: Merge openclaw.json & grant exec approvals
-        def s5():
-            owners = [x.strip() for x in (opts.owner_ids or []) if x.strip()]
-            bak = merge_openclaw_config(
-                state_dir=sd,
-                mode=opts.mode,
-                bot_token=opts.bot_token,
-                owner_ids=owners,
-                api_key=opts.api_key,
-            )
-            on_log(f"  Đã sao lưu openclaw.json -> {bak.name}")
-            agents_to_grant = ["main", "video-creator"] if opts.mode == "separate_bot" else ["main"]
-            ok, msg = grant_exec_approvals(opts.env.openclaw_cmd, sd, agents_to_grant)
-            on_log(f"  Exec approvals: {msg}")
-            if not ok:
-                raise RuntimeError(f"Không cập nhật được exec approvals: {msg}")
+        # Step 5: Merge openclaw.json & grant exec approvals (only when video core selected)
+        if opts.install_video_core:
+            def s5():
+                owners = [x.strip() for x in (opts.owner_ids or []) if x.strip()]
+                bak = merge_openclaw_config(
+                    state_dir=sd,
+                    mode=opts.mode,
+                    bot_token=opts.bot_token,
+                    owner_ids=owners,
+                    api_key=opts.api_key,
+                )
+                on_log(f"  Đã sao lưu openclaw.json -> {bak.name}")
+                agents_to_grant = ["main", "video-creator"] if opts.mode == "separate_bot" else ["main"]
+                ok, msg = grant_exec_approvals(opts.env.openclaw_cmd, sd, agents_to_grant)
+                on_log(f"  Exec approvals: {msg}")
+                if not ok:
+                    raise RuntimeError(f"Không cập nhật được exec approvals: {msg}")
 
-        exec_with_heal(4, s5)
+            exec_with_heal(4, s5)
 
-        # Step 6: Validate config & restart gateway persistently
-        def s6():
-            r = _run([opts.env.openclaw_cmd, "config", "validate"], timeout=45)
-            if r.returncode != 0:
-                restore_latest_backup(sd)
-                raise RuntimeError("openclaw.json không hợp lệ (đã tự khôi phục backup): " + (r.stderr or r.stdout)[-400:])
-            on_log("  openclaw config validate: HỢP LỆ ✓")
+            # Step 6: Validate config & restart gateway persistently
+            def s6():
+                r = _run([opts.env.openclaw_cmd, "config", "validate"], timeout=45)
+                if r.returncode != 0:
+                    restore_latest_backup(sd)
+                    raise RuntimeError("openclaw.json không hợp lệ (đã tự khôi phục backup): " + (r.stderr or r.stdout)[-400:])
+                on_log("  openclaw config validate: HỢP LỆ ✓")
 
-            if opts.env.has_instance_ps1:
-                on_log("  Đang dừng gateway cũ và khởi chạy lại ở chế độ chạy nền...")
-                _run(["powershell", "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass",
-                      "-File", str(sd / "openclaw-instance.ps1"), "gateway", "stop"], timeout=45)
-                time.sleep(2)
-                if opts.env.startup_vbs and Path(opts.env.startup_vbs).is_file():
-                    cmd_str = f'wscript.exe "{opts.env.startup_vbs}"'
-                    _run(["powershell", "-NoLogo", "-NoProfile", "-Command",
-                          f'Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{{ CommandLine = \'{cmd_str}\' }} | Out-Null'],
-                         timeout=30)
+                if opts.env.has_instance_ps1:
+                    on_log("  Đang dừng gateway cũ và khởi chạy lại ở chế độ chạy nền...")
+                    _run(["powershell", "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass",
+                          "-File", str(sd / "openclaw-instance.ps1"), "gateway", "stop"], timeout=45)
+                    time.sleep(2)
+                    if opts.env.startup_vbs and Path(opts.env.startup_vbs).is_file():
+                        cmd_str = f'wscript.exe "{opts.env.startup_vbs}"'
+                        _run(["powershell", "-NoLogo", "-NoProfile", "-Command",
+                              f'Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{{ CommandLine = \'{cmd_str}\' }} | Out-Null'],
+                             timeout=30)
+                    else:
+                        ps_cmd = f'powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "{sd}\\openclaw-instance.ps1" gateway start'
+                        _run(["powershell", "-NoLogo", "-NoProfile", "-Command",
+                              f'Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{{ CommandLine = \'{ps_cmd}\' }} | Out-Null'],
+                             timeout=30)
                 else:
-                    ps_cmd = f'powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "{sd}\\openclaw-instance.ps1" gateway start'
-                    _run(["powershell", "-NoLogo", "-NoProfile", "-Command",
-                          f'Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{{ CommandLine = \'{ps_cmd}\' }} | Out-Null'],
-                         timeout=30)
-            else:
-                _run([opts.env.openclaw_cmd, "gateway", "restart"], timeout=60)
+                    _run([opts.env.openclaw_cmd, "gateway", "restart"], timeout=60)
 
-        exec_with_heal(5, s6)
+            exec_with_heal(5, s6)
 
-        # Step 7: Verify agents & gateway ready
-        def s7():
-            on_log("  Đang chờ Gateway mở cổng và kiểm tra danh sách agent...")
-            time.sleep(10)
-            r = _run([opts.env.openclaw_cmd, "agents", "list", "--bindings"], timeout=45)
-            if r.returncode != 0:
-                raise RuntimeError("Không đọc được danh sách agent: " + (r.stderr or r.stdout)[-300:])
-            on_log(r.stdout.strip())
+            # Step 7: Verify agents & gateway ready
+            def s7():
+                on_log("  Đang chờ Gateway mở cổng và kiểm tra danh sách agent...")
+                time.sleep(10)
+                r = _run([opts.env.openclaw_cmd, "agents", "list", "--bindings"], timeout=45)
+                if r.returncode != 0:
+                    raise RuntimeError("Không đọc được danh sách agent: " + (r.stderr or r.stdout)[-300:])
+                on_log(r.stdout.strip())
 
-        exec_with_heal(6, s7)
+            exec_with_heal(6, s7)
+        else:
+            on_step(4, "skipped", "Giữ nguyên OpenClaw cũ")
+            on_step(5, "skipped", "Không cần khởi động lại Gateway")
+            on_step(6, "done", "Đã cập nhật module bổ sung")
+            on_log("\n✓ Hoàn tất cài đặt/cập nhật các module bổ sung (không làm gián đoạn OpenClaw đang chạy).")
         return True
     except Exception:
         return False
