@@ -25,6 +25,7 @@ $exeName = "OpenClaw-VideoFactory-Setup-$ver"
   --paths "src\installer" `
   --add-data "src\video_factory;src\video_factory" `
   --add-data "src\skill;src\skill" `
+  --add-data "src\installer\app_oauth_config.json;src\installer" `
   "src\installer\app_gui.py"
 
 Write-Host "`nBUILD SUCCESS ($ver):" -ForegroundColor Green

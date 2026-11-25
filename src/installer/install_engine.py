@@ -214,6 +214,7 @@ def run_install(
 
             if opts.install_google or opts.install_facebook or opts.install_youtube:
                 shutil.copy2(src_vf / "publish_social.py", vf_dir / "publish_social.py")
+                shutil.copy2(src_vf / "sheet_autopost.py", vf_dir / "sheet_autopost.py")
 
             # Merge into existing social_config.json so previously configured channels are preserved
             soc_path = vf_dir / "social_config.json"

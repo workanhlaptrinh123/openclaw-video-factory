@@ -7,6 +7,11 @@ from tkinter import filedialog, messagebox, scrolledtext, ttk
 
 from codex_healer import auto_heal
 from install_engine import InstallOptions, STEPS, run_install
+from oauth_connect import (
+    connect_facebook_get_pages,
+    connect_google_and_create_sheet,
+    load_bundled_oauth_config,
+)
 from openclaw_detect import detect_installed_modules, detect_openclaw, verify_api_key, verify_telegram_token
 from openclaw_merge import restore_latest_backup
 
@@ -243,33 +248,46 @@ class InstallerApp(tk.Tk):
         )
 
         # Google Section Frame
-        self.google_frame = tk.LabelFrame(t2, text=" Google Sheet & Google Drive ", bg=BG_CARD, fg=PRIMARY, font=("Segoe UI", 9, "bold"), padx=10, pady=6)
+        self.google_frame = tk.LabelFrame(t2, text=" Google Sheet & Google Drive (Sổ duyệt PA → PD → POSTED) ", bg=BG_CARD, fg=PRIMARY, font=("Segoe UI", 9, "bold"), padx=10, pady=6)
         self.google_frame.columnconfigure(1, weight=1)
-        tk.Label(self.google_frame, text="Link Google Sheet:", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 9)).grid(row=0, column=0, sticky="w", pady=2)
+        g_btn_row = tk.Frame(self.google_frame, bg=BG_CARD)
+        g_btn_row.grid(row=0, column=0, columnspan=3, sticky="ew", pady=(0, 4))
+        tk.Button(g_btn_row, text="🔐 Đăng nhập Google & Tạo Sheet tự động", command=self._oauth_google,
+                  bg=BG_INFO, fg=PRIMARY, relief="solid", bd=1, font=("Segoe UI", 8.5, "bold"), padx=10, pady=3, cursor="hand2").pack(side="left")
+        tk.Label(g_btn_row, text="  (hoặc nhập tay bên dưới)", font=("Segoe UI", 8), bg=BG_CARD, fg=TEXT_SUB).pack(side="left")
+        tk.Label(self.google_frame, text="Link Google Sheet:", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 9)).grid(row=1, column=0, sticky="w", pady=2)
         self.gs_url_var = tk.StringVar()
         w, _ = self._entry(self.google_frame, self.gs_url_var)
-        w.grid(row=0, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=2)
-        tk.Label(self.google_frame, text="File Google Key (.json):", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 9)).grid(row=1, column=0, sticky="w", pady=2)
+        w.grid(row=1, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=2)
+        tk.Label(self.google_frame, text="File Google Key (.json):", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 9)).grid(row=2, column=0, sticky="w", pady=2)
         self.gs_cred_var = tk.StringVar()
         w, _ = self._entry(self.google_frame, self.gs_cred_var)
-        w.grid(row=1, column=1, sticky="ew", padx=8, pady=2)
-        tk.Button(self.google_frame, text="Chọn file...", command=self._pick_google_json, bg=BG_SUBTLE, fg=TEXT_MAIN, relief="solid", bd=1, font=("Segoe UI", 8.5), padx=10, pady=3, cursor="hand2").grid(row=1, column=2, pady=2)
-        tk.Label(self.google_frame, text="Link Google Drive:", bg=BG_CARD, fg=TEXT_SUB, font=("Segoe UI", 9)).grid(row=2, column=0, sticky="w", pady=2)
+        w.grid(row=2, column=1, sticky="ew", padx=8, pady=2)
+        tk.Button(self.google_frame, text="Chọn file...", command=self._pick_google_json, bg=BG_SUBTLE, fg=TEXT_MAIN, relief="solid", bd=1, font=("Segoe UI", 8.5), padx=10, pady=3, cursor="hand2").grid(row=2, column=2, pady=2)
+        tk.Label(self.google_frame, text="Link Google Drive:", bg=BG_CARD, fg=TEXT_SUB, font=("Segoe UI", 9)).grid(row=3, column=0, sticky="w", pady=2)
         self.gd_url_var = tk.StringVar()
         w, _ = self._entry(self.google_frame, self.gd_url_var)
-        w.grid(row=2, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=2)
+        w.grid(row=3, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=2)
 
         # Facebook Section Frame
         self.fb_frame = tk.LabelFrame(t2, text=" Facebook Fanpage ", bg=BG_CARD, fg=PRIMARY, font=("Segoe UI", 9, "bold"), padx=10, pady=6)
         self.fb_frame.columnconfigure(1, weight=1)
-        tk.Label(self.fb_frame, text="Facebook Page ID:", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 9)).grid(row=0, column=0, sticky="w", pady=2)
+        self.fb_pages = []
+        fb_btn_row = tk.Frame(self.fb_frame, bg=BG_CARD)
+        fb_btn_row.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 4))
+        tk.Button(fb_btn_row, text="🔐 Đăng nhập Facebook & Chọn Fanpage", command=self._oauth_facebook,
+                  bg=BG_INFO, fg=PRIMARY, relief="solid", bd=1, font=("Segoe UI", 8.5, "bold"), padx=10, pady=3, cursor="hand2").pack(side="left")
+        self.fb_picker_var = tk.StringVar()
+        self.fb_picker = ttk.Combobox(fb_btn_row, textvariable=self.fb_picker_var, state="readonly", width=28)
+        self.fb_picker.bind("<<ComboboxSelected>>", self._on_pick_fanpage)
+        tk.Label(self.fb_frame, text="Facebook Page ID:", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 9)).grid(row=1, column=0, sticky="w", pady=2)
         self.fb_id_var = tk.StringVar()
         w, _ = self._entry(self.fb_frame, self.fb_id_var)
-        w.grid(row=0, column=1, sticky="ew", padx=(8, 0), pady=2)
-        tk.Label(self.fb_frame, text="Page Access Token:", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 9)).grid(row=1, column=0, sticky="w", pady=2)
+        w.grid(row=1, column=1, sticky="ew", padx=(8, 0), pady=2)
+        tk.Label(self.fb_frame, text="Page Access Token:", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 9)).grid(row=2, column=0, sticky="w", pady=2)
         self.fb_tok_var = tk.StringVar()
         w, _ = self._entry(self.fb_frame, self.fb_tok_var, show="*")
-        w.grid(row=1, column=1, sticky="ew", padx=(8, 0), pady=2)
+        w.grid(row=2, column=1, sticky="ew", padx=(8, 0), pady=2)
         self.fb_en_var = self.mod_fb_var
 
         # YouTube Section Frame
@@ -366,6 +384,58 @@ class InstallerApp(tk.Tk):
         p = filedialog.askopenfilename(title="Chọn file Google Service Account JSON", filetypes=[("JSON files", "*.json"), ("All files", "*.*")])
         if p:
             self.gs_cred_var.set(p)
+
+    def _oauth_google(self):
+        if not self.env.found:
+            messagebox.showwarning("Chưa thấy OpenClaw", "Không tìm thấy thư mục OpenClaw để lưu token.")
+            return
+        bundled = load_bundled_oauth_config().get("google") or {}
+        cid = self.yt_cid_var.get().strip() or (bundled.get("client_id") or "").strip()
+        csec = self.yt_csec_var.get().strip() or (bundled.get("client_secret") or "").strip()
+        secrets_dir = Path(self.env.state_dir) / "video-factory" / "secrets"
+        self._append_log("Đang mở trình duyệt đăng nhập Google (OAuth 1-click)...")
+        def worker():
+            res = connect_google_and_create_sheet(cid, csec, secrets_dir)
+            if res.get("ok"):
+                if res.get("sheet_url"):
+                    self.after(0, lambda: self.gs_url_var.set(res["sheet_url"]))
+                msg = f"✅ Đã kết nối Google thành công!\nSổ duyệt Sheet: {res.get('sheet_url') or '(đã lưu token)'}"
+                self._append_log(msg)
+                self.after(0, lambda: messagebox.showinfo("Kết nối Google thành công", msg))
+            else:
+                self._append_log(f"❌ Lỗi kết nối Google: {res.get('error')}")
+                self.after(0, lambda: messagebox.showerror("Lỗi Google OAuth", str(res.get("error"))))
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _oauth_facebook(self):
+        bundled = load_bundled_oauth_config().get("facebook") or {}
+        app_id = (bundled.get("app_id") or "").strip()
+        app_sec = (bundled.get("app_secret") or "").strip()
+        self._append_log("Đang mở trình duyệt đăng nhập Facebook để lấy danh sách Fanpage...")
+        def worker():
+            res = connect_facebook_get_pages(app_id, app_sec)
+            if res.get("ok"):
+                self.fb_pages = res["pages"]
+                names = [f"{p['name']} ({p['id']})" for p in self.fb_pages]
+                def update_picker():
+                    self.fb_picker["values"] = names
+                    self.fb_picker.pack(side="left", padx=(8, 0))
+                    self.fb_picker.current(0)
+                    self._on_pick_fanpage(None)
+                self.after(0, update_picker)
+                self._append_log(f"✅ Đã lấy {len(self.fb_pages)} Fanpage từ Facebook. Chọn Fanpage ở ô thả xuống.")
+            else:
+                self._append_log(f"❌ Lỗi kết nối Facebook: {res.get('error')}")
+                self.after(0, lambda: messagebox.showerror("Lỗi Facebook Login", str(res.get("error"))))
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_pick_fanpage(self, _evt):
+        idx = self.fb_picker.current()
+        if 0 <= idx < len(self.fb_pages):
+            page = self.fb_pages[idx]
+            self.fb_id_var.set(page["id"])
+            self.fb_tok_var.set(page["access_token"])
+            self._append_log(f"Đã chọn Fanpage: {page['name']} (ID: {page['id']})")
 
     def _refresh_modular_ui(self):
         for f in (self.soc_empty_lbl, self.google_frame, self.fb_frame, self.yt_frame):

@@ -76,9 +76,11 @@ def post_youtube(cfg: dict, title: str, caption: str, video_path: Path, privacy:
         return {"ok": False, "error": "Tự động đăng YouTube đang tắt trong cấu hình."}
     client_id = (yt.get("client_id") or "").strip()
     client_secret = (yt.get("client_secret") or "").strip()
-    token_file = ROOT / "secrets" / "token_youtube_oauth.json"
-    if not client_id or not client_secret:
-        return {"ok": False, "error": "Thiếu YOUTUBE_CLIENT_ID hoặc YOUTUBE_CLIENT_SECRET."}
+    token_file = ROOT / "secrets" / "token_google_oauth.json"
+    if not token_file.is_file():
+        token_file = ROOT / "secrets" / "token_youtube_oauth.json"
+    if not token_file.is_file() and (not client_id or not client_secret):
+        return {"ok": False, "error": "Chưa đăng nhập Google OAuth và thiếu YOUTUBE_CLIENT_ID / SECRET."}
     if not video_path.is_file():
         return {"ok": False, "error": f"Không tìm thấy file video: {video_path}"}
 
