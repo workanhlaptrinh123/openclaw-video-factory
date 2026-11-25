@@ -69,6 +69,7 @@ def merge_openclaw_config(
 
         tg = cfg.setdefault("channels", {}).setdefault("telegram", {})
         tg["enabled"] = True
+        tg["mediaMaxMb"] = max(int(tg.get("mediaMaxMb") or 0), 50)
         if owner_ids:
             tg["allowFrom"] = _merge_unique(tg.get("allowFrom", []), owner_ids)
             ea = tg.setdefault("execApprovals", {"enabled": "auto", "approvers": [], "target": "dm"})
@@ -82,6 +83,7 @@ def merge_openclaw_config(
             "groupAllowFrom": ["*"],
             "tokenFile": str(token_file),
             "enabled": True,
+            "mediaMaxMb": 50,
             "execApprovals": {
                 "enabled": "auto",
                 "approvers": list(owner_ids),

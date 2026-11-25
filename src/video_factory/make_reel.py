@@ -568,10 +568,10 @@ def build_reel(script_path: Path) -> dict:
     if dec.returncode != 0:
         raise RuntimeError(f"Full decode check failed: {dec.stderr[-300:]}")
 
-    # Step 6: Stage Telegram-ready copy in OpenClaw media/outbound (auto-optimize if > 15 MB)
+    # Step 6: Stage Telegram-ready copy in OpenClaw media/outbound (auto-optimize only if > 45 MB, below Telegram's 50 MB hard cap)
     OUTBOUND_DIR.mkdir(parents=True, exist_ok=True)
     outbound_mp4 = OUTBOUND_DIR / f"{slug}.mp4"
-    if final_mp4.stat().st_size > 15 * 1024 * 1024:
+    if final_mp4.stat().st_size > 45 * 1024 * 1024:
         subprocess.run(
             [ffmpeg, "-nostdin", "-hide_banner", "-v", "error", "-y", "-i", str(final_mp4),
              "-c:v", "libx264", "-preset", "medium", "-crf", "24",
