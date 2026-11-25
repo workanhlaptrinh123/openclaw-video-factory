@@ -139,3 +139,21 @@ def verify_telegram_token(token: str) -> dict:
         return {"ok": False, "error": str(data)}
     except Exception as exc:
         return {"ok": False, "error": str(exc)}
+
+
+def verify_api_key(api_key: str, base_url: str = "https://codex.anhlaptrinh.vn/v1") -> dict:
+    key = (api_key or "").strip()
+    if not key:
+        return {"ok": False, "error": "Vui lòng nhập API Key"}
+    try:
+        url = base_url.rstrip("/") + "/models"
+        req = urllib.request.Request(
+            url,
+            headers={"Authorization": f"Bearer {key}", "User-Agent": "OpenClawVideoInstaller/1.0"},
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        models = [m.get("id") for m in (data.get("data") or []) if isinstance(m, dict)]
+        return {"ok": True, "count": len(models), "models": models[:5]}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}

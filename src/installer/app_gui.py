@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Visual Step-by-Step Windows GUI Installer for OpenClaw Video Factory."""
+"""Modern Light 2-Column Visual Installer for OpenClaw Video Factory (inspired by installer_emtroly)."""
 import threading
 import tkinter as tk
 from pathlib import Path
@@ -7,248 +7,306 @@ from tkinter import filedialog, messagebox, scrolledtext, ttk
 
 from codex_healer import auto_heal
 from install_engine import InstallOptions, STEPS, run_install
-from openclaw_detect import detect_openclaw, verify_telegram_token
+from openclaw_detect import detect_openclaw, verify_api_key, verify_telegram_token
 from openclaw_merge import restore_latest_backup
 
-BG = "#0f172a"
-CARD = "#1e293b"
-FG = "#f8fafc"
-MUTED = "#94a3b8"
-ACCENT = "#38bdf8"
-GREEN = "#4ade80"
-YELLOW = "#facc15"
-RED = "#f87171"
+APP_VERSION = "v25.11.2026"
 
-ICONS = {
-    "pending": ("⏳", MUTED),
-    "running": ("🔄", ACCENT),
-    "healing": ("🛠️", YELLOW),
-    "done": ("✅", GREEN),
-    "error": ("❌", RED),
+# Clean light palette matching installer_emtroly
+BG_CANVAS = "#F1F5F9"
+BG_CARD = "#FFFFFF"
+BG_SUBTLE = "#F8FAFC"
+BG_INFO = "#EFF6FF"
+BG_SUCCESS = "#ECFDF5"
+BG_WARN = "#FFFBEB"
+BG_DANGER = "#FEF2F2"
+BORDER = "#E2E8F0"
+BORDER_INFO = "#BFDBFE"
+PRIMARY = "#2563EB"
+PRIMARY_DARK = "#1D4ED8"
+SUCCESS = "#059669"
+WARN = "#D97706"
+DANGER = "#DC2626"
+TEXT_MAIN = "#0F172A"
+TEXT_SUB = "#64748B"
+
+STEP_BADGES = {
+    "pending": ("●", "#CBD5E1", TEXT_SUB, "Chờ thực hiện"),
+    "running": ("▶", PRIMARY, PRIMARY, "Đang chạy..."),
+    "healing": ("🛠", WARN, WARN, "Codex đang tự sửa..."),
+    "done": ("✓", SUCCESS, SUCCESS, "Hoàn tất"),
+    "error": ("✕", DANGER, DANGER, "Gặp lỗi"),
 }
 
-
-APP_VERSION = "v25.11.2026"
 
 class InstallerApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title(f"OpenClaw Video Factory {APP_VERSION} — Cài đặt Tạo Video 9:16")
-        self.geometry("860x760")
-        self.minsize(780, 680)
-        self.configure(bg=BG)
+        self.geometry("1080x780")
+        self.minsize(980, 700)
+        self.configure(bg=BG_CANVAS)
 
         self.env = detect_openclaw()
         self.installing = False
-        self.step_labels = []
-        self.step_details = []
+        self.step_widgets = []
 
         self._build_ui()
         self._populate_detected()
 
+    def _card(self, parent, pad=16):
+        outer = tk.Frame(parent, bg=BORDER, padx=1, pady=1)
+        inner = tk.Frame(outer, bg=BG_CARD, padx=pad, pady=pad)
+        inner.pack(fill="both", expand=True)
+        return outer, inner
+
+    def _entry(self, parent, var, show="", width=None):
+        wrap = tk.Frame(parent, bg=BORDER, padx=1, pady=1)
+        kw = dict(textvariable=var, bg=BG_SUBTLE, fg=TEXT_MAIN, insertbackground=TEXT_MAIN,
+                  relief="flat", font=("Segoe UI", 9.5))
+        if show:
+            kw["show"] = show
+        if width:
+            kw["width"] = width
+        e = tk.Entry(wrap, **kw)
+        e.pack(fill="both", expand=True, ipady=5, padx=6)
+        return wrap, e
+
     def _build_ui(self):
         style = ttk.Style(self)
         style.theme_use("clam")
-        style.configure("TProgressbar", troughcolor=CARD, background=ACCENT, thickness=10)
-        style.configure("TNotebook", background=BG, borderwidth=0)
-        style.configure("TNotebook.Tab", background="#1e293b", foreground=MUTED, padding=(14, 6), font=("Segoe UI", 9, "bold"))
-        style.map("TNotebook.Tab", background=[("selected", "#0284c7")], foreground=[("selected", "#ffffff")])
+        style.configure("TProgressbar", troughcolor="#E2E8F0", background=PRIMARY, thickness=8, borderwidth=0)
+        style.configure("TNotebook", background=BG_CANVAS, borderwidth=0)
+        style.configure("TNotebook.Tab", background="#E2E8F0", foreground=TEXT_SUB, padding=(16, 8), font=("Segoe UI", 9.5, "bold"))
+        style.map("TNotebook.Tab", background=[("selected", BG_CARD)], foreground=[("selected", PRIMARY)])
 
-        # Header
-        hdr = tk.Frame(self, bg=BG, pady=10, padx=18)
-        hdr.pack(fill="x")
-        tk.Label(hdr, text="🎬 OpenClaw Video Factory Installer", font=("Segoe UI", 16, "bold"), bg=BG, fg=FG).pack(anchor="w")
-        self.banner_lbl = tk.Label(hdr, text="Đang kiểm tra OpenClaw trên máy...", font=("Segoe UI", 10), bg=BG, fg=ACCENT)
-        self.banner_lbl.pack(anchor="w", pady=(4, 0))
+        # Top Header Bar
+        topbar = tk.Frame(self, bg=BG_CARD, padx=22, pady=14)
+        topbar.pack(fill="x")
+        tk.Frame(self, bg=BORDER, height=1).pack(fill="x")
 
-        # Tabbed Config Notebook
-        nb = ttk.Notebook(self)
-        nb.pack(fill="x", padx=18, pady=(0, 8))
+        title_row = tk.Frame(topbar, bg=BG_CARD)
+        title_row.pack(fill="x")
+        tk.Label(title_row, text="🎬 OpenClaw Video Factory", font=("Segoe UI", 16, "bold"), bg=BG_CARD, fg=TEXT_MAIN).pack(side="left")
+        tk.Label(title_row, text=f"  {APP_VERSION}", font=("Segoe UI", 10, "bold"), bg=BG_INFO, fg=PRIMARY, padx=8, pady=2).pack(side="left", padx=(10, 0))
+        tk.Label(topbar, text="Cài đặt tính năng tạo video dọc 9:16 + tự động đăng bài vào OpenClaw đang chạy trên máy",
+                 font=("Segoe UI", 9.5), bg=BG_CARD, fg=TEXT_SUB).pack(anchor="w", pady=(3, 0))
 
-        # --- TAB 1: OpenClaw & Video ---
-        cfg = tk.Frame(nb, bg=CARD, padx=16, pady=10)
-        nb.add(cfg, text="1. OpenClaw & Tạo Video")
+        # Main 2-Column Body
+        body = tk.Frame(self, bg=BG_CANVAS, padx=18, pady=14)
+        body.pack(fill="both", expand=True)
+        body.columnconfigure(0, weight=0, minsize=310)
+        body.columnconfigure(1, weight=1)
+        body.rowconfigure(0, weight=1)
 
-        # Mode selection
-        mode_row = tk.Frame(cfg, bg=CARD)
-        mode_row.pack(fill="x", pady=(0, 6))
-        tk.Label(mode_row, text="Chế độ cài đặt:", font=("Segoe UI", 10, "bold"), bg=CARD, fg=FG).pack(side="left")
-        self.mode_var = tk.StringVar(value="separate_bot")
-        tk.Radiobutton(
-            mode_row, text="Tạo Bot Video riêng (Khuyên dùng)", variable=self.mode_var, value="separate_bot",
-            bg=CARD, fg=FG, selectcolor=BG, activebackground=CARD, activeforeground=FG, command=self._toggle_mode
-        ).pack(side="left", padx=(12, 16))
-        tk.Radiobutton(
-            mode_row, text="Gắn vào Bot OpenClaw đang có", variable=self.mode_var, value="existing_bot",
-            bg=CARD, fg=FG, selectcolor=BG, activebackground=CARD, activeforeground=FG, command=self._toggle_mode
-        ).pack(side="left")
+        # LEFT COLUMN: Status + 7-Step Visual Stepper
+        left = tk.Frame(body, bg=BG_CANVAS)
+        left.grid(row=0, column=0, sticky="nsew", padx=(0, 14))
 
-        # Form Grid (Tab 1)
-        form = tk.Frame(cfg, bg=CARD)
-        form.pack(fill="x")
-        form.columnconfigure(1, weight=1)
+        # OpenClaw Detection Card
+        det_outer, det = self._card(left, pad=14)
+        det_outer.pack(fill="x", pady=(0, 12))
+        tk.Label(det, text="Trạng thái OpenClaw trên máy", font=("Segoe UI", 10, "bold"), bg=BG_CARD, fg=TEXT_MAIN).pack(anchor="w")
+        self.det_badge = tk.Label(det, text="Đang kiểm tra...", font=("Segoe UI", 9, "bold"), bg=BG_INFO, fg=PRIMARY, padx=8, pady=4, anchor="w", justify="left", wraplength=260)
+        self.det_badge.pack(fill="x", pady=(8, 4))
+        self.det_meta = tk.Label(det, text="", font=("Segoe UI", 8.5), bg=BG_CARD, fg=TEXT_SUB, anchor="w", justify="left", wraplength=260)
+        self.det_meta.pack(fill="x")
 
-        tk.Label(form, text="Telegram Bot Token:", bg=CARD, fg=FG, font=("Segoe UI", 9)).grid(row=0, column=0, sticky="w", pady=3)
-        self.token_var = tk.StringVar()
-        self.token_entry = tk.Entry(form, textvariable=self.token_var, bg=BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
-        self.token_entry.grid(row=0, column=1, sticky="ew", padx=8, pady=3, ipady=3)
-        self.check_tok_btn = tk.Button(form, text="Kiểm tra Bot", command=self._check_token, bg="#334155", fg=FG, relief="flat", padx=10, pady=2)
-        self.check_tok_btn.grid(row=0, column=2, pady=3)
-
-        tk.Label(form, text="Telegram ID chủ máy:", bg=CARD, fg=FG, font=("Segoe UI", 9)).grid(row=1, column=0, sticky="w", pady=3)
-        self.owner_var = tk.StringVar()
-        tk.Entry(form, textvariable=self.owner_var, bg=BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(
-            row=1, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=3, ipady=3
-        )
-
-        tk.Label(form, text="API Key (Ảnh AI + Codex sửa lỗi):", bg=CARD, fg=FG, font=("Segoe UI", 9)).grid(row=2, column=0, sticky="w", pady=3)
-        self.api_var = tk.StringVar()
-        tk.Entry(form, textvariable=self.api_var, show="*", bg=BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(
-            row=2, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=3, ipady=3
-        )
-
-        tk.Label(form, text="Pexels API Key (tuỳ chọn):", bg=CARD, fg=MUTED, font=("Segoe UI", 9)).grid(row=3, column=0, sticky="w", pady=3)
-        self.pexels_var = tk.StringVar()
-        tk.Entry(form, textvariable=self.pexels_var, bg=BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(
-            row=3, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=3, ipady=3
-        )
-
-        self.heal_var = tk.BooleanVar(value=True)
-        tk.Checkbutton(
-            cfg,
-            text="Bật Codex AI Tự Sửa Lỗi (tự động dùng Codex CLI hoặc gọi Codex API dự phòng khi gặp lỗi)",
-            variable=self.heal_var,
-            bg=CARD, fg=YELLOW, selectcolor=BG, activebackground=CARD, activeforeground=YELLOW,
-            font=("Segoe UI", 9, "bold"),
-        ).pack(anchor="w", pady=(6, 0))
-
-        # --- TAB 2: Auto-Publish (Google / Facebook / YouTube) ---
-        soc = tk.Frame(nb, bg=CARD, padx=16, pady=10)
-        nb.add(soc, text="2. Tự động đăng bài (Google / Facebook / YouTube)")
-        soc.columnconfigure(1, weight=1)
-
-        tk.Label(soc, text="Link Google Sheet (sổ duyệt):", bg=CARD, fg=FG, font=("Segoe UI", 9)).grid(row=0, column=0, sticky="w", pady=2)
-        self.gs_url_var = tk.StringVar()
-        tk.Entry(soc, textvariable=self.gs_url_var, bg=BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(
-            row=0, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=2, ipady=3
-        )
-
-        tk.Label(soc, text="File Google Key (.json):", bg=CARD, fg=FG, font=("Segoe UI", 9)).grid(row=1, column=0, sticky="w", pady=2)
-        self.gs_cred_var = tk.StringVar()
-        tk.Entry(soc, textvariable=self.gs_cred_var, bg=BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(
-            row=1, column=1, sticky="ew", padx=8, pady=2, ipady=3
-        )
-        tk.Button(soc, text="Chọn file...", command=self._pick_google_json, bg="#334155", fg=FG, relief="flat", padx=8, pady=2).grid(row=1, column=2, pady=2)
-
-        tk.Label(soc, text="Link Google Drive (tuỳ chọn):", bg=CARD, fg=MUTED, font=("Segoe UI", 9)).grid(row=2, column=0, sticky="w", pady=2)
-        self.gd_url_var = tk.StringVar()
-        tk.Entry(soc, textvariable=self.gd_url_var, bg=BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(
-            row=2, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=2, ipady=3
-        )
-
-        tk.Label(soc, text="Facebook Page ID:", bg=CARD, fg=FG, font=("Segoe UI", 9)).grid(row=3, column=0, sticky="w", pady=2)
-        self.fb_id_var = tk.StringVar()
-        tk.Entry(soc, textvariable=self.fb_id_var, bg=BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(
-            row=3, column=1, sticky="ew", padx=8, pady=2, ipady=3
-        )
-        self.fb_en_var = tk.BooleanVar(value=False)
-        tk.Checkbutton(soc, text="Bật đăng FB", variable=self.fb_en_var, bg=CARD, fg=ACCENT, selectcolor=BG, activebackground=CARD, activeforeground=ACCENT).grid(row=3, column=2, sticky="w")
-
-        tk.Label(soc, text="Facebook Page Access Token:", bg=CARD, fg=FG, font=("Segoe UI", 9)).grid(row=4, column=0, sticky="w", pady=2)
-        self.fb_tok_var = tk.StringVar()
-        tk.Entry(soc, textvariable=self.fb_tok_var, show="*", bg=BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(
-            row=4, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=2, ipady=3
-        )
-
-        tk.Label(soc, text="Link kênh YouTube:", bg=CARD, fg=FG, font=("Segoe UI", 9)).grid(row=5, column=0, sticky="w", pady=2)
-        self.yt_url_var = tk.StringVar()
-        tk.Entry(soc, textvariable=self.yt_url_var, bg=BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(
-            row=5, column=1, sticky="ew", padx=8, pady=2, ipady=3
-        )
-        self.yt_en_var = tk.BooleanVar(value=False)
-        tk.Checkbutton(soc, text="Bật đăng YT", variable=self.yt_en_var, bg=CARD, fg=ACCENT, selectcolor=BG, activebackground=CARD, activeforeground=ACCENT).grid(row=5, column=2, sticky="w")
-
-        tk.Label(soc, text="YouTube Client ID / Secret:", bg=CARD, fg=FG, font=("Segoe UI", 9)).grid(row=6, column=0, sticky="w", pady=2)
-        yt_pair = tk.Frame(soc, bg=CARD)
-        yt_pair.grid(row=6, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=2)
-        yt_pair.columnconfigure(0, weight=1)
-        yt_pair.columnconfigure(1, weight=1)
-        self.yt_cid_var = tk.StringVar()
-        self.yt_csec_var = tk.StringVar()
-        tk.Entry(yt_pair, textvariable=self.yt_cid_var, bg=BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(row=0, column=0, sticky="ew", padx=(0, 6), ipady=3)
-        tk.Entry(yt_pair, textvariable=self.yt_csec_var, show="*", bg=BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(row=0, column=1, sticky="ew", ipady=3)
-
-        # Progress Checklist Card
-        prog = tk.Frame(self, bg=CARD, padx=16, pady=12)
-        prog.pack(fill="x", padx=18, pady=(0, 10))
-        tk.Label(prog, text="Tiến độ cài đặt từng bước", font=("Segoe UI", 10, "bold"), bg=CARD, fg=FG).pack(anchor="w", pady=(0, 6))
-
-        self.pbar = ttk.Progressbar(prog, mode="determinate", maximum=len(STEPS))
-        self.pbar.pack(fill="x", pady=(0, 8))
+        # 7-Step Progress Stepper Card
+        st_outer, st = self._card(left, pad=14)
+        st_outer.pack(fill="both", expand=True)
+        tk.Label(st, text="Tiến độ cài đặt (7 bước)", font=("Segoe UI", 10, "bold"), bg=BG_CARD, fg=TEXT_MAIN).pack(anchor="w")
+        self.pct_lbl = tk.Label(st, text="0 / 7 bước hoàn tất", font=("Segoe UI", 8.5), bg=BG_CARD, fg=TEXT_SUB)
+        self.pct_lbl.pack(anchor="w", pady=(2, 6))
+        self.pbar = ttk.Progressbar(st, mode="determinate", maximum=len(STEPS))
+        self.pbar.pack(fill="x", pady=(0, 12))
 
         for i, title in enumerate(STEPS):
-            row = tk.Frame(prog, bg=CARD)
-            row.pack(fill="x", pady=2)
-            ic = tk.Label(row, text="⏳", font=("Segoe UI", 10), bg=CARD, fg=MUTED, width=3)
-            ic.pack(side="left")
-            tk.Label(row, text=f"{i + 1}. {title}", font=("Segoe UI", 9, "bold"), bg=CARD, fg=FG).pack(side="left")
-            det = tk.Label(row, text="Chờ", font=("Segoe UI", 9), bg=CARD, fg=MUTED)
-            det.pack(side="right")
-            self.step_labels.append(ic)
-            self.step_details.append(det)
+            item = tk.Frame(st, bg=BG_SUBTLE, padx=10, pady=7)
+            item.pack(fill="x", pady=3)
+            dot = tk.Label(item, text="●", font=("Segoe UI", 10, "bold"), bg=BG_SUBTLE, fg="#CBD5E1", width=2)
+            dot.pack(side="left", anchor="n")
+            txt_col = tk.Frame(item, bg=BG_SUBTLE)
+            txt_col.pack(side="left", fill="x", expand=True)
+            t_lbl = tk.Label(txt_col, text=f"Bước {i + 1}: {title}", font=("Segoe UI", 9, "bold"), bg=BG_SUBTLE, fg=TEXT_MAIN, anchor="w", wraplength=220, justify="left")
+            t_lbl.pack(anchor="w")
+            d_lbl = tk.Label(txt_col, text="Chờ thực hiện", font=("Segoe UI", 8), bg=BG_SUBTLE, fg=TEXT_SUB, anchor="w")
+            d_lbl.pack(anchor="w")
+            self.step_widgets.append((item, dot, t_lbl, d_lbl))
 
-        # Action Buttons
-        btns = tk.Frame(self, bg=BG, padx=18, pady=4)
-        btns.pack(fill="x")
-        self.start_btn = tk.Button(
-            btns, text="🚀 Bắt đầu cài đặt", command=self._start_install,
-            bg="#0284c7", fg="white", font=("Segoe UI", 10, "bold"), relief="flat", padx=18, pady=7
-        )
+        # RIGHT COLUMN: Tabs (Config + Social) + Buttons + Live Log
+        right = tk.Frame(body, bg=BG_CANVAS)
+        right.grid(row=0, column=1, sticky="nsew")
+        right.rowconfigure(2, weight=1)
+        right.columnconfigure(0, weight=1)
+
+        nb = ttk.Notebook(right)
+        nb.grid(row=0, column=0, sticky="ew")
+
+        # --- TAB 1: OpenClaw & API Key cá nhân ---
+        t1 = tk.Frame(nb, bg=BG_CARD, padx=18, pady=14)
+        nb.add(t1, text="  1. Kết nối OpenClaw & API Key  ")
+        t1.columnconfigure(1, weight=1)
+
+        # Mode radio
+        m_row = tk.Frame(t1, bg=BG_INFO, padx=12, pady=8)
+        m_row.grid(row=0, column=0, columnspan=3, sticky="ew", pady=(0, 10))
+        tk.Label(m_row, text="Chế độ cài:", font=("Segoe UI", 9.5, "bold"), bg=BG_INFO, fg=TEXT_MAIN).pack(side="left")
+        self.mode_var = tk.StringVar(value="separate_bot")
+        tk.Radiobutton(m_row, text="Tạo Bot Video riêng (Khuyên dùng)", variable=self.mode_var, value="separate_bot",
+                       bg=BG_INFO, fg=TEXT_MAIN, activebackground=BG_INFO, command=self._toggle_mode).pack(side="left", padx=(12, 16))
+        tk.Radiobutton(m_row, text="Gắn vào Bot hiện có", variable=self.mode_var, value="existing_bot",
+                       bg=BG_INFO, fg=TEXT_MAIN, activebackground=BG_INFO, command=self._toggle_mode).pack(side="left")
+
+        # Telegram Bot Token
+        tk.Label(t1, text="Telegram Bot Token:", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 9.5, "bold")).grid(row=1, column=0, sticky="w", pady=(4, 2))
+        self.token_var = tk.StringVar()
+        tok_wrap, self.token_entry = self._entry(t1, self.token_var)
+        tok_wrap.grid(row=1, column=1, sticky="ew", padx=8, pady=(4, 2))
+        self.check_tok_btn = tk.Button(t1, text="Kiểm tra Bot", command=self._check_token, bg=BG_SUBTLE, fg=TEXT_MAIN,
+                                       relief="solid", bd=1, font=("Segoe UI", 9), padx=10, pady=4, cursor="hand2")
+        self.check_tok_btn.grid(row=1, column=2, pady=(4, 2))
+
+        # Telegram Owner ID
+        tk.Label(t1, text="Telegram ID chủ máy:", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 9.5, "bold")).grid(row=2, column=0, sticky="w", pady=4)
+        self.owner_var = tk.StringVar()
+        own_wrap, _ = self._entry(t1, self.owner_var)
+        own_wrap.grid(row=2, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=4)
+
+        # Personal API Key (with Show/Hide + Verify + Use Existing)
+        tk.Label(t1, text="API Key cá nhân (Ảnh AI + Codex):", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 9.5, "bold")).grid(row=3, column=0, sticky="w", pady=(6, 2))
+        self.api_var = tk.StringVar()
+        api_wrap, self.api_entry = self._entry(t1, self.api_var, show="*")
+        api_wrap.grid(row=3, column=1, sticky="ew", padx=8, pady=(6, 2))
+        api_btns = tk.Frame(t1, bg=BG_CARD)
+        api_btns.grid(row=3, column=2, pady=(6, 2))
+        self.show_api = False
+        self.toggle_api_btn = tk.Button(api_btns, text="Hiện", command=self._toggle_api_vis, bg=BG_SUBTLE, fg=TEXT_MAIN, relief="solid", bd=1, font=("Segoe UI", 8.5), padx=7, pady=4, cursor="hand2")
+        self.toggle_api_btn.pack(side="left", padx=(0, 4))
+        tk.Button(api_btns, text="Kiểm tra Key", command=self._check_api, bg=BG_SUBTLE, fg=PRIMARY, relief="solid", bd=1, font=("Segoe UI", 8.5, "bold"), padx=8, pady=4, cursor="hand2").pack(side="left")
+
+        api_hint_row = tk.Frame(t1, bg=BG_CARD)
+        api_hint_row.grid(row=4, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=(0, 4))
+        tk.Label(api_hint_row, text="Mỗi khách nhập API Key riêng của mình (dùng tạo ảnh AI & Codex tự sửa lỗi).", font=("Segoe UI", 8), bg=BG_CARD, fg=TEXT_SUB).pack(side="left")
+        self.use_existing_api_btn = tk.Button(api_hint_row, text="Lấy key sẵn từ OpenClaw", command=self._load_existing_api,
+                                              bg=BG_INFO, fg=PRIMARY, relief="flat", font=("Segoe UI", 8, "bold"), padx=6, pady=1, cursor="hand2")
+
+        # Pexels Key
+        tk.Label(t1, text="Pexels API Key (tuỳ chọn):", bg=BG_CARD, fg=TEXT_SUB, font=("Segoe UI", 9)).grid(row=5, column=0, sticky="w", pady=4)
+        self.pexels_var = tk.StringVar()
+        px_wrap, _ = self._entry(t1, self.pexels_var)
+        px_wrap.grid(row=5, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=4)
+
+        # Codex Self-Heal Checkbox
+        self.heal_var = tk.BooleanVar(value=True)
+        heal_box = tk.Frame(t1, bg=BG_WARN, padx=10, pady=6)
+        heal_box.grid(row=6, column=0, columnspan=3, sticky="ew", pady=(8, 0))
+        tk.Checkbutton(
+            heal_box,
+            text="Bật Codex AI Tự Sửa Lỗi (tự dùng Codex CLI hoặc API Key ở trên để tự sửa nếu gặp lỗi cài đặt)",
+            variable=self.heal_var, bg=BG_WARN, fg="#92400E", activebackground=BG_WARN,
+            font=("Segoe UI", 9, "bold"),
+        ).pack(anchor="w")
+
+        # --- TAB 2: Tự động đăng bài (Google / Facebook / YouTube) ---
+        t2 = tk.Frame(nb, bg=BG_CARD, padx=18, pady=14)
+        nb.add(t2, text="  2. Tự động đăng bài (Google / FB / YT)  ")
+        t2.columnconfigure(1, weight=1)
+
+        tk.Label(t2, text="Link Google Sheet (sổ duyệt):", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 9)).grid(row=0, column=0, sticky="w", pady=3)
+        self.gs_url_var = tk.StringVar()
+        w, _ = self._entry(t2, self.gs_url_var)
+        w.grid(row=0, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=3)
+
+        tk.Label(t2, text="File Google Service Key (.json):", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 9)).grid(row=1, column=0, sticky="w", pady=3)
+        self.gs_cred_var = tk.StringVar()
+        w, _ = self._entry(t2, self.gs_cred_var)
+        w.grid(row=1, column=1, sticky="ew", padx=8, pady=3)
+        tk.Button(t2, text="Chọn file...", command=self._pick_google_json, bg=BG_SUBTLE, fg=TEXT_MAIN, relief="solid", bd=1, font=("Segoe UI", 8.5), padx=10, pady=4, cursor="hand2").grid(row=1, column=2, pady=3)
+
+        tk.Label(t2, text="Link Google Drive (tuỳ chọn):", bg=BG_CARD, fg=TEXT_SUB, font=("Segoe UI", 9)).grid(row=2, column=0, sticky="w", pady=3)
+        self.gd_url_var = tk.StringVar()
+        w, _ = self._entry(t2, self.gd_url_var)
+        w.grid(row=2, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=3)
+
+        tk.Label(t2, text="Facebook Page ID:", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 9)).grid(row=3, column=0, sticky="w", pady=3)
+        self.fb_id_var = tk.StringVar()
+        w, _ = self._entry(t2, self.fb_id_var)
+        w.grid(row=3, column=1, sticky="ew", padx=8, pady=3)
+        self.fb_en_var = tk.BooleanVar(value=False)
+        tk.Checkbutton(t2, text="Bật đăng FB", variable=self.fb_en_var, bg=BG_CARD, fg=PRIMARY, font=("Segoe UI", 9, "bold")).grid(row=3, column=2, sticky="w")
+
+        tk.Label(t2, text="Facebook Page Access Token:", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 9)).grid(row=4, column=0, sticky="w", pady=3)
+        self.fb_tok_var = tk.StringVar()
+        w, _ = self._entry(t2, self.fb_tok_var, show="*")
+        w.grid(row=4, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=3)
+
+        tk.Label(t2, text="Link kênh YouTube:", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 9)).grid(row=5, column=0, sticky="w", pady=3)
+        self.yt_url_var = tk.StringVar()
+        w, _ = self._entry(t2, self.yt_url_var)
+        w.grid(row=5, column=1, sticky="ew", padx=8, pady=3)
+        self.yt_en_var = tk.BooleanVar(value=False)
+        tk.Checkbutton(t2, text="Bật đăng YT", variable=self.yt_en_var, bg=BG_CARD, fg=PRIMARY, font=("Segoe UI", 9, "bold")).grid(row=5, column=2, sticky="w")
+
+        tk.Label(t2, text="YouTube Client ID / Secret:", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 9)).grid(row=6, column=0, sticky="w", pady=3)
+        yt_box = tk.Frame(t2, bg=BG_CARD)
+        yt_box.grid(row=6, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=3)
+        yt_box.columnconfigure(0, weight=1)
+        yt_box.columnconfigure(1, weight=1)
+        self.yt_cid_var = tk.StringVar()
+        self.yt_csec_var = tk.StringVar()
+        w1, _ = self._entry(yt_box, self.yt_cid_var)
+        w2, _ = self._entry(yt_box, self.yt_csec_var, show="*")
+        w1.grid(row=0, column=0, sticky="ew", padx=(0, 6))
+        w2.grid(row=0, column=1, sticky="ew")
+
+        # Action Bar
+        act = tk.Frame(right, bg=BG_CANVAS, pady=10)
+        act.grid(row=1, column=0, sticky="ew")
+        self.start_btn = tk.Button(act, text="🚀 Bắt đầu cài đặt ngay", command=self._start_install,
+                                   bg=PRIMARY, fg="white", activebackground=PRIMARY_DARK, activeforeground="white",
+                                   font=("Segoe UI", 10, "bold"), relief="flat", padx=20, pady=9, cursor="hand2")
         self.start_btn.pack(side="left")
+        tk.Button(act, text="🛠️ Gọi Codex tự sửa lỗi", command=self._manual_heal,
+                  bg="#FFFBEB", fg="#B45309", relief="solid", bd=1, font=("Segoe UI", 9.5, "bold"), padx=14, pady=8, cursor="hand2").pack(side="left", padx=10)
+        tk.Button(act, text="↩️ Hoàn tác backup", command=self._rollback,
+                  bg=BG_CARD, fg=TEXT_MAIN, relief="solid", bd=1, font=("Segoe UI", 9), padx=12, pady=8, cursor="hand2").pack(side="right")
 
-        self.heal_btn = tk.Button(
-            btns, text="🛠️ Gọi Codex tự sửa lỗi", command=self._manual_heal,
-            bg="#b45309", fg="white", font=("Segoe UI", 9, "bold"), relief="flat", padx=14, pady=7
-        )
-        self.heal_btn.pack(side="left", padx=10)
-
-        self.rollback_btn = tk.Button(
-            btns, text="↩️ Hoàn tác (Khôi phục backup)", command=self._rollback,
-            bg="#475569", fg="white", font=("Segoe UI", 9), relief="flat", padx=12, pady=7
-        )
-        self.rollback_btn.pack(side="right")
-
-        # Live Log Box
-        log_frame = tk.Frame(self, bg=BG, padx=18, pady=8)
-        log_frame.pack(fill="both", expand=True)
-        tk.Label(log_frame, text="Nhật ký chi tiết (Live Log):", font=("Segoe UI", 9), bg=BG, fg=MUTED).pack(anchor="w")
-        self.log_box = scrolledtext.ScrolledText(
-            log_frame, bg="#020617", fg="#e2e8f0", font=("Consolas", 9), relief="flat", height=10
-        )
-        self.log_box.pack(fill="both", expand=True, pady=(4, 0))
+        # Live Log Card
+        log_outer, log_inner = self._card(right, pad=12)
+        log_outer.grid(row=2, column=0, sticky="nsew")
+        tk.Label(log_inner, text="Nhật ký cài đặt trực tiếp (Live Log)", font=("Segoe UI", 9.5, "bold"), bg=BG_CARD, fg=TEXT_MAIN).pack(anchor="w", pady=(0, 6))
+        self.log_box = scrolledtext.ScrolledText(log_inner, bg="#0F172A", fg="#E2E8F0", font=("Consolas", 9), relief="flat", height=11)
+        self.log_box.pack(fill="both", expand=True)
 
     def _populate_detected(self):
         if self.env.found:
-            cx_txt = "Có Codex CLI" if self.env.codex_cmd else "Dùng Codex API"
-            self.banner_lbl.config(
-                text=f"✅ Đã phát hiện OpenClaw tại: {self.env.state_dir}  |  {cx_txt}  |  Agents: {', '.join(self.env.existing_agents) or 'main'}",
-                fg=GREEN,
-            )
+            self.det_badge.config(text="✅ Đã tìm thấy OpenClaw đang cài", bg=BG_SUCCESS, fg=SUCCESS)
+            cx = "Có sẵn Codex CLI" if self.env.codex_cmd else "Dùng Codex API dự phòng"
+            self.det_meta.config(text=f"Thư mục: {self.env.state_dir}\nAgent hiện có: {', '.join(self.env.existing_agents) or 'main'}\nTự sửa lỗi: {cx}")
             if self.env.existing_owners:
                 self.owner_var.set(", ".join(self.env.existing_owners))
             if self.env.existing_api_key:
-                self.api_var.set(self.env.existing_api_key)
-                self._append_log("Đã tự nhận API Key có sẵn từ member-provider.secret.")
+                self.use_existing_api_btn.pack(side="right")
+                self._append_log("Phát hiện OpenClaw đã có sẵn API key — khách có thể nhập key riêng hoặc bấm 'Lấy key sẵn từ OpenClaw'.")
         else:
-            self.banner_lbl.config(
-                text="⚠️ Chưa phát hiện OpenClaw trên máy này. Vui lòng cài OpenClaw trước khi chạy bộ cài này.",
-                fg=RED,
-            )
+            self.det_badge.config(text="⚠️ Không tìm thấy OpenClaw trên máy", bg=BG_DANGER, fg=DANGER)
+            self.det_meta.config(text="Vui lòng cài đặt OpenClaw trước khi chạy bộ cài tạo video này.")
+
+    def _load_existing_api(self):
+        if self.env.existing_api_key:
+            self.api_var.set(self.env.existing_api_key)
+            self._append_log("Đã điền API Key từ cấu hình OpenClaw hiện tại.")
+
+    def _toggle_api_vis(self):
+        self.show_api = not self.show_api
+        self.api_entry.config(show="" if self.show_api else "*")
+        self.toggle_api_btn.config(text="Ẩn" if self.show_api else "Hiện")
 
     def _pick_google_json(self):
-        path = filedialog.askopenfilename(title="Chọn file Google Service Account JSON", filetypes=[("JSON files", "*.json"), ("All files", "*.*")])
-        if path:
-            self.gs_cred_var.set(path)
+        p = filedialog.askopenfilename(title="Chọn file Google Service Account JSON", filetypes=[("JSON files", "*.json"), ("All files", "*.*")])
+        if p:
+            self.gs_cred_var.set(p)
 
     def _toggle_mode(self):
         state = "normal" if self.mode_var.get() == "separate_bot" else "disabled"
@@ -256,18 +314,20 @@ class InstallerApp(tk.Tk):
         self.check_tok_btn.config(state=state)
 
     def _append_log(self, msg: str):
-        def _do():
-            self.log_box.insert("end", msg + "\n")
-            self.log_box.see("end")
-        self.after(0, _do)
+        self.after(0, lambda: (self.log_box.insert("end", msg + "\n"), self.log_box.see("end")))
 
     def _set_step(self, idx: int, state: str, detail: str):
         def _do():
-            icon, color = ICONS.get(state, ("⏳", MUTED))
-            self.step_labels[idx].config(text=icon, fg=color)
-            self.step_details[idx].config(text=detail, fg=color)
-            done_count = sum(1 for lbl in self.step_labels if lbl.cget("text") == "✅")
+            icon, dot_fg, text_fg, default_txt = STEP_BADGES.get(state, STEP_BADGES["pending"])
+            item, dot, t_lbl, d_lbl = self.step_widgets[idx]
+            bg = BG_SUCCESS if state == "done" else (BG_INFO if state == "running" else (BG_WARN if state == "healing" else (BG_DANGER if state == "error" else BG_SUBTLE)))
+            for w in (item, dot, t_lbl, d_lbl, t_lbl.master):
+                w.config(bg=bg)
+            dot.config(text=icon, fg=dot_fg)
+            d_lbl.config(text=detail or default_txt, fg=text_fg)
+            done_count = sum(1 for _, d, _, _ in self.step_widgets if d.cget("text") == "✓")
             self.pbar["value"] = done_count
+            self.pct_lbl.config(text=f"{done_count} / {len(STEPS)} bước hoàn tất")
         self.after(0, _do)
 
     def _check_token(self):
@@ -288,6 +348,24 @@ class InstallerApp(tk.Tk):
                 self.after(0, lambda: messagebox.showerror("Lỗi Token", msg))
         threading.Thread(target=worker, daemon=True).start()
 
+    def _check_api(self):
+        key = self.api_var.get().strip()
+        if not key:
+            messagebox.showwarning("Thiếu API Key", "Vui lòng nhập API Key cá nhân trước.")
+            return
+        self._append_log("Đang kiểm tra API Key cá nhân...")
+        def worker():
+            res = verify_api_key(key)
+            if res.get("ok"):
+                msg = f"✅ API Key hợp lệ! Kết nối thành công ({res['count']} model khả dụng)."
+                self._append_log(msg)
+                self.after(0, lambda: messagebox.showinfo("API Key hợp lệ", msg))
+            else:
+                msg = f"❌ API Key không hợp lệ hoặc không kết nối được: {res.get('error')}"
+                self._append_log(msg)
+                self.after(0, lambda: messagebox.showerror("Lỗi API Key", msg))
+        threading.Thread(target=worker, daemon=True).start()
+
     def _start_install(self):
         if self.installing:
             return
@@ -296,13 +374,16 @@ class InstallerApp(tk.Tk):
             return
         mode = self.mode_var.get()
         if mode == "separate_bot" and not self.token_var.get().strip():
-            messagebox.showwarning("Thiếu Bot Token", "Vui lòng nhập Telegram Bot Token (hoặc chuyển sang chế độ gắn vào Bot đang có).")
+            messagebox.showwarning("Thiếu Bot Token", "Vui lòng nhập Telegram Bot Token (hoặc chọn 'Gắn vào Bot hiện có').")
+            return
+        if not self.api_var.get().strip():
+            messagebox.showwarning("Thiếu API Key", "Vui lòng nhập API Key cá nhân (hoặc bấm 'Lấy key sẵn từ OpenClaw').")
             return
 
         self.installing = True
         self.start_btn.config(state="disabled", text="⏳ Đang cài đặt...")
         for i in range(len(STEPS)):
-            self._set_step(i, "pending", "Chờ")
+            self._set_step(i, "pending", "Chờ thực hiện")
 
         owners = [x.strip() for x in self.owner_var.get().replace(";", ",").split(",") if x.strip()]
         opts = InstallOptions(
@@ -329,17 +410,11 @@ class InstallerApp(tk.Tk):
             ok = run_install(opts, self._set_step, self._append_log)
             def finish():
                 self.installing = False
-                self.start_btn.config(state="normal", text="🚀 Bắt đầu cài đặt")
+                self.start_btn.config(state="normal", text="🚀 Bắt đầu cài đặt ngay")
                 if ok:
-                    messagebox.showinfo(
-                        "Cài đặt hoàn tất!",
-                        "Đã cài xong OpenClaw Video Factory!\n\nBây giờ anh/chị có thể mở Telegram nhắn cho bot để tạo video 9:16 ngay.",
-                    )
+                    messagebox.showinfo("Hoàn tất!", "Đã cài xong OpenClaw Video Factory!\n\nMở Telegram nhắn cho bot để tạo video 9:16 ngay.")
                 else:
-                    messagebox.showerror(
-                        "Có lỗi xảy ra",
-                        "Quá trình cài đặt gặp lỗi. Xem chi tiết ở khung Nhật ký hoặc bấm 'Gọi Codex tự sửa lỗi'.",
-                    )
+                    messagebox.showerror("Có lỗi xảy ra", "Cài đặt gặp lỗi. Xem khung Nhật ký hoặc bấm 'Gọi Codex tự sửa lỗi'.")
             self.after(0, finish)
 
         threading.Thread(target=worker, daemon=True).start()
@@ -351,7 +426,7 @@ class InstallerApp(tk.Tk):
         if not log_text:
             messagebox.showinfo("Chưa có log lỗi", "Chưa có nhật ký lỗi để Codex phân tích.")
             return
-        self._append_log("\n=== Gọi Codex tự chẩn đoán & sửa lỗi theo yêu cầu ===")
+        self._append_log("\n=== Gọi Codex tự chẩn đoán & sửa lỗi ===")
         def worker():
             ok, msg = auto_heal(
                 self.env.codex_cmd,
@@ -368,7 +443,7 @@ class InstallerApp(tk.Tk):
     def _rollback(self):
         if not self.env.found:
             return
-        if not messagebox.askyesno("Xác nhận hoàn tác", "Khôi phục openclaw.json về bản sao lưu gần nhất trước khi cài?"):
+        if not messagebox.askyesno("Xác nhận hoàn tác", "Khôi phục openclaw.json về bản sao lưu gần nhất?"):
             return
         ok, msg = restore_latest_backup(Path(self.env.state_dir))
         self._append_log(f"↩️ {msg}")
