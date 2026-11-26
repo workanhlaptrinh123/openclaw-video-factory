@@ -15,7 +15,7 @@ from oauth_connect import (
 from openclaw_detect import detect_installed_modules, detect_openclaw, verify_api_key, verify_telegram_token
 from openclaw_merge import restore_latest_backup
 
-APP_VERSION = "v25.11.2026"
+APP_VERSION = "v26.11.2026"
 
 # Clean light palette matching installer_emtroly
 BG_CANVAS = "#F1F5F9"
@@ -69,7 +69,7 @@ class InstallerApp(tk.Tk):
     def _entry(self, parent, var, show="", width=None):
         wrap = tk.Frame(parent, bg=BORDER, padx=1, pady=1)
         kw = dict(textvariable=var, bg=BG_SUBTLE, fg=TEXT_MAIN, insertbackground=TEXT_MAIN,
-                  relief="flat", font=("Segoe UI", 9.5))
+                  relief="flat", font=("Segoe UI", 10))
         if show:
             kw["show"] = show
         if width:
@@ -83,7 +83,7 @@ class InstallerApp(tk.Tk):
         style.theme_use("clam")
         style.configure("TProgressbar", troughcolor="#E2E8F0", background=PRIMARY, thickness=8, borderwidth=0)
         style.configure("TNotebook", background=BG_CANVAS, borderwidth=0)
-        style.configure("TNotebook.Tab", background="#E2E8F0", foreground=TEXT_SUB, padding=(16, 8), font=("Segoe UI", 9.5, "bold"))
+        style.configure("TNotebook.Tab", background="#E2E8F0", foreground=TEXT_SUB, padding=(16, 8), font=("Segoe UI", 10, "bold"))
         style.map("TNotebook.Tab", background=[("selected", BG_CARD)], foreground=[("selected", PRIMARY)])
 
         # Top Header Bar
@@ -96,7 +96,7 @@ class InstallerApp(tk.Tk):
         tk.Label(title_row, text="🎬 OpenClaw Video Factory", font=("Segoe UI", 16, "bold"), bg=BG_CARD, fg=TEXT_MAIN).pack(side="left")
         tk.Label(title_row, text=f"  {APP_VERSION}", font=("Segoe UI", 10, "bold"), bg=BG_INFO, fg=PRIMARY, padx=8, pady=2).pack(side="left", padx=(10, 0))
         tk.Label(topbar, text="Cài đặt tính năng tạo video dọc 9:16 + tự động đăng bài vào OpenClaw đang chạy trên máy",
-                 font=("Segoe UI", 9.5), bg=BG_CARD, fg=TEXT_SUB).pack(anchor="w", pady=(3, 0))
+                 font=("Segoe UI", 10), bg=BG_CARD, fg=TEXT_SUB).pack(anchor="w", pady=(3, 0))
 
         # Main 2-Column Body
         body = tk.Frame(self, bg=BG_CANVAS, padx=18, pady=14)
@@ -115,7 +115,7 @@ class InstallerApp(tk.Tk):
         tk.Label(det, text="Trạng thái OpenClaw trên máy", font=("Segoe UI", 10, "bold"), bg=BG_CARD, fg=TEXT_MAIN).pack(anchor="w")
         self.det_badge = tk.Label(det, text="Đang kiểm tra...", font=("Segoe UI", 9, "bold"), bg=BG_INFO, fg=PRIMARY, padx=8, pady=4, anchor="w", justify="left", wraplength=260)
         self.det_badge.pack(fill="x", pady=(6, 4))
-        self.det_meta = tk.Label(det, text="", font=("Segoe UI", 8.5), bg=BG_CARD, fg=TEXT_SUB, anchor="w", justify="left", wraplength=260)
+        self.det_meta = tk.Label(det, text="", font=("Segoe UI", 9), bg=BG_CARD, fg=TEXT_SUB, anchor="w", justify="left", wraplength=260)
         self.det_meta.pack(fill="x")
 
         # Modular Selection Card (Cài từng phần + trạng thái Đã cài / Chưa cài)
@@ -145,7 +145,7 @@ class InstallerApp(tk.Tk):
         st_outer, st = self._card(left, pad=12)
         st_outer.pack(fill="both", expand=True)
         tk.Label(st, text="Tiến độ cài đặt (7 bước)", font=("Segoe UI", 10, "bold"), bg=BG_CARD, fg=TEXT_MAIN).pack(anchor="w")
-        self.pct_lbl = tk.Label(st, text="0 / 7 bước hoàn tất", font=("Segoe UI", 8.5), bg=BG_CARD, fg=TEXT_SUB)
+        self.pct_lbl = tk.Label(st, text="0 / 7 bước hoàn tất", font=("Segoe UI", 9), bg=BG_CARD, fg=TEXT_SUB)
         self.pct_lbl.pack(anchor="w", pady=(2, 6))
         self.pbar = ttk.Progressbar(st, mode="determinate", maximum=len(STEPS))
         self.pbar.pack(fill="x", pady=(0, 12))
@@ -180,7 +180,7 @@ class InstallerApp(tk.Tk):
         # Mode radio
         m_row = tk.Frame(t1, bg=BG_INFO, padx=12, pady=8)
         m_row.grid(row=0, column=0, columnspan=3, sticky="ew", pady=(0, 10))
-        tk.Label(m_row, text="Chế độ cài:", font=("Segoe UI", 9.5, "bold"), bg=BG_INFO, fg=TEXT_MAIN).pack(side="left")
+        tk.Label(m_row, text="Chế độ cài:", font=("Segoe UI", 10, "bold"), bg=BG_INFO, fg=TEXT_MAIN).pack(side="left")
         self.mode_var = tk.StringVar(value="separate_bot")
         tk.Radiobutton(m_row, text="Tạo Bot Video riêng (Khuyên dùng)", variable=self.mode_var, value="separate_bot",
                        bg=BG_INFO, fg=TEXT_MAIN, activebackground=BG_INFO, command=self._toggle_mode).pack(side="left", padx=(12, 16))
@@ -188,7 +188,7 @@ class InstallerApp(tk.Tk):
                        bg=BG_INFO, fg=TEXT_MAIN, activebackground=BG_INFO, command=self._toggle_mode).pack(side="left")
 
         # Telegram Bot Token
-        tk.Label(t1, text="Telegram Bot Token:", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 9.5, "bold")).grid(row=1, column=0, sticky="w", pady=(4, 2))
+        tk.Label(t1, text="Telegram Bot Token:", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 10, "bold")).grid(row=1, column=0, sticky="w", pady=(4, 2))
         self.token_var = tk.StringVar()
         tok_wrap, self.token_entry = self._entry(t1, self.token_var)
         tok_wrap.grid(row=1, column=1, sticky="ew", padx=8, pady=(4, 2))
@@ -197,22 +197,22 @@ class InstallerApp(tk.Tk):
         self.check_tok_btn.grid(row=1, column=2, pady=(4, 2))
 
         # Telegram Owner ID
-        tk.Label(t1, text="Telegram ID chủ máy:", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 9.5, "bold")).grid(row=2, column=0, sticky="w", pady=4)
+        tk.Label(t1, text="Telegram ID chủ máy:", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 10, "bold")).grid(row=2, column=0, sticky="w", pady=4)
         self.owner_var = tk.StringVar()
         own_wrap, _ = self._entry(t1, self.owner_var)
         own_wrap.grid(row=2, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=4)
 
         # Personal API Key (with Show/Hide + Verify + Use Existing)
-        tk.Label(t1, text="API Key cá nhân (Ảnh AI + Codex):", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 9.5, "bold")).grid(row=3, column=0, sticky="w", pady=(6, 2))
+        tk.Label(t1, text="API Key cá nhân (Ảnh AI + Codex):", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 10, "bold")).grid(row=3, column=0, sticky="w", pady=(6, 2))
         self.api_var = tk.StringVar()
         api_wrap, self.api_entry = self._entry(t1, self.api_var, show="*")
         api_wrap.grid(row=3, column=1, sticky="ew", padx=8, pady=(6, 2))
         api_btns = tk.Frame(t1, bg=BG_CARD)
         api_btns.grid(row=3, column=2, pady=(6, 2))
         self.show_api = False
-        self.toggle_api_btn = tk.Button(api_btns, text="Hiện", command=self._toggle_api_vis, bg=BG_SUBTLE, fg=TEXT_MAIN, relief="solid", bd=1, font=("Segoe UI", 8.5), padx=7, pady=4, cursor="hand2")
+        self.toggle_api_btn = tk.Button(api_btns, text="Hiện", command=self._toggle_api_vis, bg=BG_SUBTLE, fg=TEXT_MAIN, relief="solid", bd=1, font=("Segoe UI", 9), padx=7, pady=4, cursor="hand2")
         self.toggle_api_btn.pack(side="left", padx=(0, 4))
-        tk.Button(api_btns, text="Kiểm tra Key", command=self._check_api, bg=BG_SUBTLE, fg=PRIMARY, relief="solid", bd=1, font=("Segoe UI", 8.5, "bold"), padx=8, pady=4, cursor="hand2").pack(side="left")
+        tk.Button(api_btns, text="Kiểm tra Key", command=self._check_api, bg=BG_SUBTLE, fg=PRIMARY, relief="solid", bd=1, font=("Segoe UI", 9, "bold"), padx=8, pady=4, cursor="hand2").pack(side="left")
 
         api_hint_row = tk.Frame(t1, bg=BG_CARD)
         api_hint_row.grid(row=4, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=(0, 4))
@@ -244,7 +244,7 @@ class InstallerApp(tk.Tk):
         self.soc_empty_lbl = tk.Label(
             t2,
             text="Khách chưa chọn module đăng bài nào (Google Sheet / Facebook / YouTube).\n\nTích chọn ở mục 'Chọn phần muốn cài' bên cột trái nếu muốn cấu hình thêm kênh đăng bài, hoặc bỏ qua nếu chỉ cần chức năng Tạo Video 9:16.",
-            font=("Segoe UI", 9.5), bg=BG_SUBTLE, fg=TEXT_SUB, padx=16, pady=24, justify="left", wraplength=600,
+            font=("Segoe UI", 10), bg=BG_SUBTLE, fg=TEXT_SUB, padx=16, pady=24, justify="left", wraplength=600,
         )
 
         # Google Section Frame
@@ -253,7 +253,7 @@ class InstallerApp(tk.Tk):
         g_btn_row = tk.Frame(self.google_frame, bg=BG_CARD)
         g_btn_row.grid(row=0, column=0, columnspan=3, sticky="ew", pady=(0, 4))
         tk.Button(g_btn_row, text="🔐 Đăng nhập Google & Tạo Sheet tự động", command=self._oauth_google,
-                  bg=BG_INFO, fg=PRIMARY, relief="solid", bd=1, font=("Segoe UI", 8.5, "bold"), padx=10, pady=3, cursor="hand2").pack(side="left")
+                  bg=BG_INFO, fg=PRIMARY, relief="solid", bd=1, font=("Segoe UI", 9, "bold"), padx=10, pady=3, cursor="hand2").pack(side="left")
         tk.Label(g_btn_row, text="  (hoặc nhập tay bên dưới)", font=("Segoe UI", 8), bg=BG_CARD, fg=TEXT_SUB).pack(side="left")
         tk.Label(self.google_frame, text="Link Google Sheet:", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 9)).grid(row=1, column=0, sticky="w", pady=2)
         self.gs_url_var = tk.StringVar()
@@ -263,7 +263,7 @@ class InstallerApp(tk.Tk):
         self.gs_cred_var = tk.StringVar()
         w, _ = self._entry(self.google_frame, self.gs_cred_var)
         w.grid(row=2, column=1, sticky="ew", padx=8, pady=2)
-        tk.Button(self.google_frame, text="Chọn file...", command=self._pick_google_json, bg=BG_SUBTLE, fg=TEXT_MAIN, relief="solid", bd=1, font=("Segoe UI", 8.5), padx=10, pady=3, cursor="hand2").grid(row=2, column=2, pady=2)
+        tk.Button(self.google_frame, text="Chọn file...", command=self._pick_google_json, bg=BG_SUBTLE, fg=TEXT_MAIN, relief="solid", bd=1, font=("Segoe UI", 9), padx=10, pady=3, cursor="hand2").grid(row=2, column=2, pady=2)
         tk.Label(self.google_frame, text="Link Google Drive:", bg=BG_CARD, fg=TEXT_SUB, font=("Segoe UI", 9)).grid(row=3, column=0, sticky="w", pady=2)
         self.gd_url_var = tk.StringVar()
         w, _ = self._entry(self.google_frame, self.gd_url_var)
@@ -276,7 +276,7 @@ class InstallerApp(tk.Tk):
         fb_btn_row = tk.Frame(self.fb_frame, bg=BG_CARD)
         fb_btn_row.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 4))
         tk.Button(fb_btn_row, text="🔐 Đăng nhập Facebook & Chọn Fanpage", command=self._oauth_facebook,
-                  bg=BG_INFO, fg=PRIMARY, relief="solid", bd=1, font=("Segoe UI", 8.5, "bold"), padx=10, pady=3, cursor="hand2").pack(side="left")
+                  bg=BG_INFO, fg=PRIMARY, relief="solid", bd=1, font=("Segoe UI", 9, "bold"), padx=10, pady=3, cursor="hand2").pack(side="left")
         self.fb_picker_var = tk.StringVar()
         self.fb_picker = ttk.Combobox(fb_btn_row, textvariable=self.fb_picker_var, state="readonly", width=28)
         self.fb_picker.bind("<<ComboboxSelected>>", self._on_pick_fanpage)
@@ -320,14 +320,14 @@ class InstallerApp(tk.Tk):
                                    font=("Segoe UI", 10, "bold"), relief="flat", padx=20, pady=9, cursor="hand2")
         self.start_btn.pack(side="left")
         tk.Button(act, text="🛠️ Gọi Codex tự sửa lỗi", command=self._manual_heal,
-                  bg="#FFFBEB", fg="#B45309", relief="solid", bd=1, font=("Segoe UI", 9.5, "bold"), padx=14, pady=8, cursor="hand2").pack(side="left", padx=10)
+                  bg="#FFFBEB", fg="#B45309", relief="solid", bd=1, font=("Segoe UI", 10, "bold"), padx=14, pady=8, cursor="hand2").pack(side="left", padx=10)
         tk.Button(act, text="↩️ Hoàn tác backup", command=self._rollback,
                   bg=BG_CARD, fg=TEXT_MAIN, relief="solid", bd=1, font=("Segoe UI", 9), padx=12, pady=8, cursor="hand2").pack(side="right")
 
         # Live Log Card
         log_outer, log_inner = self._card(right, pad=12)
         log_outer.grid(row=2, column=0, sticky="nsew")
-        tk.Label(log_inner, text="Nhật ký cài đặt trực tiếp (Live Log)", font=("Segoe UI", 9.5, "bold"), bg=BG_CARD, fg=TEXT_MAIN).pack(anchor="w", pady=(0, 6))
+        tk.Label(log_inner, text="Nhật ký cài đặt trực tiếp (Live Log)", font=("Segoe UI", 10, "bold"), bg=BG_CARD, fg=TEXT_MAIN).pack(anchor="w", pady=(0, 6))
         self.log_box = scrolledtext.ScrolledText(log_inner, bg="#0F172A", fg="#E2E8F0", font=("Consolas", 9), relief="flat", height=11)
         self.log_box.pack(fill="both", expand=True)
 
