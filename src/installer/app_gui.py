@@ -84,6 +84,7 @@ class InstallerApp(tk.Tk):
             kw["show"] = show
         e = tk.Entry(wrap, **kw)
         e.pack(fill="both", expand=True, ipady=6, padx=8)
+        wrap.bind("<Button-1>", lambda _ev, ent=e: ent.focus_set())
         return wrap, e
 
     def _build_ui(self):
@@ -464,9 +465,12 @@ class InstallerApp(tk.Tk):
             self.soc_empty_lbl.pack(fill="x", pady=10)
 
     def _toggle_mode(self):
-        state = "normal" if self.mode_var.get() == "separate_bot" else "disabled"
+        is_sep = self.mode_var.get() == "separate_bot"
+        state = "normal" if is_sep else "disabled"
         self.token_entry.config(state=state)
         self.check_tok_btn.config(state=state)
+        if is_sep:
+            self.token_entry.focus_set()
 
     def _append_log(self, msg: str):
         self.after(0, lambda: (self.log_box.insert("end", msg + "\n"), self.log_box.see("end")))
