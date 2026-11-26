@@ -66,16 +66,24 @@ class InstallerApp(tk.Tk):
         inner.pack(fill="both", expand=True)
         return outer, inner
 
-    def _entry(self, parent, var, show="", width=None):
-        wrap = tk.Frame(parent, bg=BORDER, padx=1, pady=1)
-        kw = dict(textvariable=var, bg=BG_SUBTLE, fg=TEXT_MAIN, insertbackground=TEXT_MAIN,
-                  relief="flat", font=("Segoe UI", 10))
+    def _entry(self, parent, var, show="", width=34):
+        wrap = tk.Frame(parent, bg="#FFFFFF", highlightbackground="#94A3B8", highlightcolor=PRIMARY, highlightthickness=1)
+        kw = dict(
+            textvariable=var,
+            bg="#FFFFFF",
+            fg=TEXT_MAIN,
+            disabledbackground="#F1F5F9",
+            disabledforeground="#94A3B8",
+            insertbackground=PRIMARY,
+            relief="flat",
+            bd=0,
+            width=width,
+            font=("Consolas", 10),
+        )
         if show:
             kw["show"] = show
-        if width:
-            kw["width"] = width
         e = tk.Entry(wrap, **kw)
-        e.pack(fill="both", expand=True, ipady=5, padx=6)
+        e.pack(fill="both", expand=True, ipady=6, padx=8)
         return wrap, e
 
     def _build_ui(self):
@@ -175,7 +183,9 @@ class InstallerApp(tk.Tk):
         # --- TAB 1: OpenClaw & API Key cá nhân ---
         t1 = tk.Frame(nb, bg=BG_CARD, padx=18, pady=14)
         nb.add(t1, text="  1. Kết nối OpenClaw & API Key  ")
-        t1.columnconfigure(1, weight=1)
+        t1.columnconfigure(0, weight=0, minsize=175)
+        t1.columnconfigure(1, weight=1, minsize=260)
+        t1.columnconfigure(2, weight=0)
 
         # Mode radio
         m_row = tk.Frame(t1, bg=BG_INFO, padx=12, pady=8)
@@ -203,7 +213,7 @@ class InstallerApp(tk.Tk):
         own_wrap.grid(row=2, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=4)
 
         # Personal API Key (with Show/Hide + Verify + Use Existing)
-        tk.Label(t1, text="API Key cá nhân (Ảnh AI + Codex):", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 10, "bold")).grid(row=3, column=0, sticky="w", pady=(6, 2))
+        tk.Label(t1, text="API Key cá nhân:", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 10, "bold")).grid(row=3, column=0, sticky="w", pady=(6, 2))
         self.api_var = tk.StringVar()
         api_wrap, self.api_entry = self._entry(t1, self.api_var, show="*")
         api_wrap.grid(row=3, column=1, sticky="ew", padx=8, pady=(6, 2))
@@ -216,7 +226,7 @@ class InstallerApp(tk.Tk):
 
         api_hint_row = tk.Frame(t1, bg=BG_CARD)
         api_hint_row.grid(row=4, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=(0, 4))
-        tk.Label(api_hint_row, text="Mỗi khách nhập API Key riêng của mình (dùng tạo ảnh AI & Codex tự sửa lỗi).", font=("Segoe UI", 8), bg=BG_CARD, fg=TEXT_SUB).pack(side="left")
+        tk.Label(api_hint_row, text="Key riêng của từng khách (ảnh AI + Codex tự sửa lỗi).", font=("Segoe UI", 8), bg=BG_CARD, fg=TEXT_SUB).pack(side="left")
         self.use_existing_api_btn = tk.Button(api_hint_row, text="Lấy key sẵn từ OpenClaw", command=self._load_existing_api,
                                               bg=BG_INFO, fg=PRIMARY, relief="flat", font=("Segoe UI", 8, "bold"), padx=6, pady=1, cursor="hand2")
 
