@@ -144,6 +144,74 @@ def _build_subtitle_png(text: str, w: int, h: int, font_path: Path, dest: Path) 
     return pos_x, pos_y
 
 
+def _split_short_cues(cues: list, max_words: int = 6) -> list:
+    """Split long sentence cues into punchy 5-6 word TikTok-style chunks synced proportionally."""
+    out = []
+    for a, b, text in cues:
+        words = (text or "").strip().split()
+        if len(words) <= max_words:
+            if words:
+                out.append((a, b, " ".join(words)))
+            continue
+        # Balance chunk sizes cleanly (e.g. 11 words -> 6 + 5, 14 words -> 5 + 5 + 4)
+        num_chunks = (len(words) + max_words - 1) // max_words
+        base_sz = len(words) // num_chunks
+        extra = len(words) % num_chunks
+        chunks, pos = [], 0
+        for ci in range(num_chunks):
+            sz = base_sz + (1 if ci < extra else 0)
+            chunks.append(" ".join(words[pos:pos + sz]))
+            pos += sz
+        weights = [max(1, len(c)) for c in chunks]
+        total_w = sum(weights)
+        cur = a
+        for ci, (chunk, cw) in enumerate(zip(chunks, weights)):
+            end = b if ci == len(chunks) - 1 else round(cur + (b - a) * cw / total_w, 3)
+            out.append((round(cur, 3), round(max(cur + 0.15, end), 3), chunk))
+            cur = end
+    return out
+
+
+def _detect_best_h264_encoder(ffmpeg: str) -> List[str]:
+    """Probe hardware H.264 encoders (NVENC -> Intel QSV -> AMD AMF) with safe libx264 fallback."""
+    candidates = [
+        ("h264_nvenc", ["-c:v", "h264_nvenc", "-preset", "p4", "-cq", "21", "-pix_fmt", "yuv420p"]),
+        ("h264_qsv",   ["-c:v", "h264_qsv",   "-preset", "fast", "-global_quality", "21", "-pix_fmt", "nv12"]),
+        ("h264_amf",   ["-c:v", "h264_amf",   "-quality", "balanced", "-qp_i", "21", "-qp_p", "21", "-pix_fmt", "yuv420p"]),
+    ]
+    for name, flags in candidates:
+        try:
+            r = subprocess.run(
+                [ffmpeg, "-nostdin", "-hide_banner", "-v", "error",
+                 "-f", "lavfi", "-i", "color=c=black:s=256x256:r=30:d=0.1",
+                 *flags, "-f", "null", "-"],
+                capture_output=True, timeout=6, stdin=subprocess.DEVNULL,
+            )
+            if r.returncode == 0:
+                return flags
+        except Exception:
+            pass
+    return ["-c:v", "libx264", "-profile:v", "high", "-preset", "fast", "-crf", "20", "-pix_fmt", "yuv420p"]
+
+
+def _build_logo_png(logo_src: Path, w: int, h: int, dest: Path) -> Tuple[int, int]:
+    """Scale customer brand logo cleanly preserving aspect ratio (~22% frame width)."""
+    im = Image.open(logo_src).convert("RGBA")
+    target_w = int(w * (0.16 if w > h else 0.24))
+    ratio = target_w / max(1, im.width)
+    target_h = max(1, int(im.height * ratio))
+    max_h = int(h * 0.11)
+    if target_h > max_h:
+        scale = max_h / target_h
+        target_w = max(1, int(target_w * scale))
+        target_h = max_h
+    resized = im.resize((target_w, target_h), Image.Resampling.LANCZOS)
+    resized.save(dest, "PNG")
+    margin_x = int(w * 0.04)
+    margin_y = int(h * 0.035)
+    return margin_x, margin_y
+
+
 def render_fast_reel(
     ffmpeg: str,
     ws: Path,
@@ -154,6 +222,7 @@ def render_fast_reel(
     title: str,
     font_bold: Path,
     final_mp4: Path,
+    logo_path: Path = None,
 ):
     """Compose scenes, audio, scrims, hook, and subtitles in one fast Full HD FFmpeg pass."""
     ov_dir = ws / "overlays"
@@ -183,6 +252,12 @@ def render_fast_reel(
     _build_scrim_png(w, h, scrim_png)
     overlay_specs.append((scrim_png, 0, 0, None))
 
+    # Optional customer brand logo (top-left, throughout video)
+    if logo_path and Path(logo_path).is_file():
+        logo_png = ov_dir / "brand_logo.png"
+        lx, ly = _build_logo_png(Path(logo_path), w, h, logo_png)
+        overlay_specs.append((logo_png, lx, ly, None))
+
     hook_text = str((timeline[0]["scene"].get("text") or title)).strip()
     if hook_text:
         hook_png = ov_dir / "hook.png"
@@ -193,7 +268,8 @@ def render_fast_reel(
     for item in timeline:
         i = item["index"]
         start = item["start"]
-        for k, (a, b, ctext) in enumerate(item["cues"]):
+        short_cues = _split_short_cues(item["cues"], max_words=6)
+        for k, (a, b, ctext) in enumerate(short_cues):
             ctext = (ctext or "").strip()
             if not ctext:
                 continue
@@ -229,12 +305,13 @@ def render_fast_reel(
 
     fc = ";".join(v_filters + a_filters + [v_concat, a_concat] + ov_filters)
 
+    v_enc_flags = _detect_best_h264_encoder(ffmpeg)
     cmd = [
         ffmpeg, "-nostdin", "-hide_banner", "-v", "error", "-y",
         *inputs,
         "-filter_complex", fc,
         "-map", "[vout]", "-map", "[amaster]",
-        "-c:v", "libx264", "-profile:v", "high", "-preset", "fast", "-crf", "20", "-pix_fmt", "yuv420p",
+        *v_enc_flags,
         "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart",
         "-t", f"{total_duration:.3f}",
         str(final_mp4),

@@ -15,7 +15,7 @@ from oauth_connect import (
 from openclaw_detect import detect_installed_modules, detect_openclaw, verify_api_key, verify_telegram_token
 from openclaw_merge import restore_latest_backup
 
-APP_VERSION = "v27.11.2026.2"
+APP_VERSION = "v27.11.2026.3"
 
 # Executive Light Palette (matching installer_emtroly)
 BG_CANVAS = "#F1F5F9"
@@ -74,6 +74,8 @@ class InstallerApp(tk.Tk):
         self.owner_var = tk.StringVar()
         self.api_var = tk.StringVar()
         self.pixabay_var = tk.StringVar()
+        self.logo_en_var = tk.BooleanVar(value=False)
+        self.logo_path_var = tk.StringVar()
         self.heal_var = tk.BooleanVar(value=True)
 
         self.gs_url_var = tk.StringVar()
@@ -321,9 +323,22 @@ class InstallerApp(tk.Tk):
             row=6, column=1, columnspan=2, sticky="w", padx=(10, 0), pady=(0, 10)
         )
 
+        # Optional Brand Logo Row (tích hoặc không tích)
+        logo_chk_row = tk.Frame(c, bg=BG_CARD)
+        logo_chk_row.grid(row=7, column=0, columnspan=3, sticky="ew", pady=(4, 2))
+        tk.Checkbutton(
+            logo_chk_row, text="Gắn logo thương hiệu lên mọi video (tuỳ chọn)",
+            variable=self.logo_en_var, bg=BG_CARD, fg=TEXT_MAIN, activebackground=BG_CARD,
+            font=("Segoe UI", 9, "bold"), command=self._toggle_logo_row,
+        ).pack(side="left")
+
+        self.logo_lbl = tk.Label(c, text="File logo (.png/.jpg):", bg=BG_CARD, fg=TEXT_SUB, font=("Segoe UI", 9))
+        self.logo_wrap, _ = self._entry(c, self.logo_path_var)
+        self.logo_pick_btn = self._btn(c, "Chọn logo...", self._pick_brand_logo, kind="secondary", pad_x=10, pad_y=4)
+
         # Codex Self-Heal card
         heal_box = tk.Frame(c, bg=BG_WARN, padx=12, pady=10)
-        heal_box.grid(row=7, column=0, columnspan=3, sticky="ew", pady=(6, 0))
+        heal_box.grid(row=9, column=0, columnspan=3, sticky="ew", pady=(8, 0))
         tk.Checkbutton(
             heal_box,
             text="Bật Codex AI Tự Sửa Lỗi (tự dùng Codex CLI hoặc API Key ở trên để tự sửa nếu gặp lỗi cài đặt)",
@@ -331,6 +346,7 @@ class InstallerApp(tk.Tk):
         ).pack(anchor="w")
 
         self._toggle_mode()
+        self._toggle_logo_row()
 
     # ---- PAGE 3: Auto-Publish (Google / Facebook / YouTube) ----
     def _build_page_social(self):
@@ -548,6 +564,21 @@ class InstallerApp(tk.Tk):
         self.api_entry.config(show="" if self.show_api else "*")
         self.toggle_api_btn.config(text="Ẩn" if self.show_api else "Hiện")
 
+    def _toggle_logo_row(self):
+        if self.logo_en_var.get():
+            self.logo_lbl.grid(row=8, column=0, sticky="w", pady=4)
+            self.logo_wrap.grid(row=8, column=1, sticky="ew", padx=10, pady=4)
+            self.logo_pick_btn.grid(row=8, column=2, pady=4)
+        else:
+            self.logo_lbl.grid_remove()
+            self.logo_wrap.grid_remove()
+            self.logo_pick_btn.grid_remove()
+
+    def _pick_brand_logo(self):
+        p = filedialog.askopenfilename(title="Chọn file logo thương hiệu", filetypes=[("Image files", "*.png;*.jpg;*.jpeg;*.webp"), ("All files", "*.*")])
+        if p:
+            self.logo_path_var.set(p)
+
     def _pick_google_json(self):
         p = filedialog.askopenfilename(title="Chọn file Google Service Account JSON", filetypes=[("JSON files", "*.json"), ("All files", "*.*")])
         if p:
@@ -694,6 +725,8 @@ class InstallerApp(tk.Tk):
             api_key=self.api_var.get().strip(),
             pixabay_key=self.pixabay_var.get().strip(),
             enable_codex_heal=self.heal_var.get(),
+            brand_logo_enabled=self.logo_en_var.get(),
+            brand_logo_path=self.logo_path_var.get().strip(),
             install_video_core=self.mod_video_var.get(),
             install_google=self.mod_google_var.get(),
             install_facebook=self.mod_fb_var.get(),

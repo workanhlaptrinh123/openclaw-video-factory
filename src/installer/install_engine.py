@@ -35,6 +35,9 @@ class InstallOptions:
     api_key: str = ""
     pixabay_key: str = ""
     enable_codex_heal: bool = True
+    # Optional brand logo
+    brand_logo_enabled: bool = False
+    brand_logo_path: str = ""
     # Modular selection flags (Cài từng phần)
     install_video_core: bool = True
     install_google: bool = False
@@ -258,7 +261,25 @@ def run_install(
             if social_cfg:
                 soc_path.write_text(json.dumps(social_cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
-            # Write .env if Pexels or Codex key provided
+            # Optional brand logo config
+            if opts.install_video_core:
+                brand_dir = vf_dir / "assets" / "brand"
+                brand_dir.mkdir(parents=True, exist_ok=True)
+                logo_dst = brand_dir / "logo.png"
+                if opts.brand_logo_enabled and opts.brand_logo_path.strip() and Path(opts.brand_logo_path.strip()).is_file():
+                    shutil.copy2(Path(opts.brand_logo_path.strip()), logo_dst)
+                    (vf_dir / "config" / "brand.json").write_text(
+                        json.dumps({"enabled": True, "logo_path": str(logo_dst)}, ensure_ascii=False, indent=2) + "\n",
+                        encoding="utf-8",
+                    )
+                    on_log(f"  Đã gắn logo thương hiệu: {logo_dst}")
+                else:
+                    (vf_dir / "config" / "brand.json").write_text(
+                        json.dumps({"enabled": False, "logo_path": ""}, ensure_ascii=False, indent=2) + "\n",
+                        encoding="utf-8",
+                    )
+
+            # Write .env if Pixabay or Codex key provided
             if opts.install_video_core:
                 env_lines = []
                 if opts.api_key.strip():

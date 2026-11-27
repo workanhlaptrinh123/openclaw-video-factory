@@ -517,7 +517,23 @@ def build_reel(script_path: Path) -> dict:
 
     rules = load_pronunciation_rules()
 
-    # Step 1: Synthesize TTS for all scenes sequentially (avoids edge-tts WS contention)
+    # Step 1: Launch AI image generation in parallel WITH TTS synthesis (cuts 30-40% total time!)
+    needs_ai = any(
+        str(s.get("image_prompt") or "").strip()
+        and not str(s.get("image") or "").strip()
+        and not str(s.get("video") or s.get("local_video") or "").strip()
+        for s in scenes
+    )
+    codex_key = load_codex_api_key() if needs_ai else ""
+    ai_pool = concurrent.futures.ThreadPoolExecutor(max_workers=4)
+    ai_futs = {}
+    if needs_ai:
+        for i, sc in enumerate(scenes, 1):
+            p = str(sc.get("image_prompt") or "").strip()
+            if p and not str(sc.get("image") or "").strip() and not str(sc.get("video") or sc.get("local_video") or "").strip():
+                ai_futs[i] = ai_pool.submit(generate_ai_image, p, ws / "input" / f"scene-{i}.png", codex_key, preset)
+
+    # Synthesize TTS sequentially while AI images generate in background
     tts_results = {}
     for i, sc in enumerate(scenes, 1):
         vtext = str(sc.get("voice") or "").strip()
@@ -527,6 +543,10 @@ def build_reel(script_path: Path) -> dict:
             vtext, voice_name, voice_rate, rules,
             ws / "input" / f"voice-{i}.mp3", ws / "input" / f"voice-{i}.srt"
         )
+
+    # Wait for any in-flight AI images
+    ai_ready = {i: fut.result() for i, fut in ai_futs.items()}
+    ai_pool.shutdown(wait=False)
 
     # Compute exact timeline from measured speech durations
     cursor = 0.0
@@ -548,15 +568,14 @@ def build_reel(script_path: Path) -> dict:
         cursor += scene_dur
     total_duration = round(cursor, 3)
 
-    # Step 2: Generate / fetch scene visuals in parallel
-    needs_ai = any(str(s.get("image_prompt") or "").strip() and not str(s.get("image") or "").strip() for s in scenes)
+    # Step 2: Encode / fetch scene visuals in parallel
     needs_stock = any(
         (str(s.get("pixabay_query") or "").strip() or str(s.get("pexels_query") or "").strip())
         and not str(s.get("image_prompt") or "").strip()
         and not str(s.get("image") or "").strip()
+        and not str(s.get("video") or s.get("local_video") or "").strip()
         for s in scenes
     )
-    codex_key = load_codex_api_key() if needs_ai else ""
     pixabay_key = load_pixabay_api_key() if needs_stock else ""
     pexels_key = load_pexels_api_key() if needs_stock else ""
 
@@ -578,8 +597,7 @@ def build_reel(script_path: Path) -> dict:
             image_to_clip(src, dur, dest_mp4, preset)
             return str(sc.get("image_source") or "")
         if str(sc.get("image_prompt") or "").strip():
-            dest_png = ws / "input" / f"scene-{i}.png"
-            generate_ai_image(sc["image_prompt"].strip(), dest_png, codex_key, preset)
+            dest_png = ai_ready.get(i) or generate_ai_image(sc["image_prompt"].strip(), ws / "input" / f"scene-{i}.png", codex_key, preset)
             image_to_clip(dest_png, dur, dest_mp4, preset)
             return str(sc.get("image_source") or AI_CREDIT)
         if str(sc.get("pixabay_query") or "").strip():
@@ -683,6 +701,15 @@ def build_reel(script_path: Path) -> dict:
             raise RuntimeError(f"hyperframes render failed: {(r_render.stderr or r_render.stdout)[-600:]}")
     else:
         from fast_renderer import render_fast_reel
+        brand_logo = None
+        brand_cfg_file = ROOT / "config" / "brand.json"
+        if brand_cfg_file.is_file():
+            try:
+                bcfg = json.loads(brand_cfg_file.read_text(encoding="utf-8-sig"))
+                if bcfg.get("enabled") and bcfg.get("logo_path") and Path(bcfg["logo_path"]).is_file():
+                    brand_logo = Path(bcfg["logo_path"])
+            except Exception:
+                pass
         render_fast_reel(
             ffmpeg=find_bin("ffmpeg"),
             ws=ws,
@@ -693,6 +720,7 @@ def build_reel(script_path: Path) -> dict:
             title=title,
             font_bold=ROOT / "assets" / "fonts" / "BeVietnamPro-Bold.ttf",
             final_mp4=final_mp4,
+            logo_path=brand_logo,
         )
 
     # Step 5: Technical verification (ffprobe + full decode)
