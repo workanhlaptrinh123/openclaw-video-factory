@@ -155,10 +155,12 @@ def merge_openclaw_config(
 
 def grant_exec_approvals(openclaw_cmd: str, state_dir: Path, agent_ids: List[str]) -> Tuple[bool, str]:
     """Ensure target agent(s) have full exec permissions in OpenClaw exec_approvals_config."""
+    no_win = getattr(subprocess, "CREATE_NO_WINDOW", 0)
     try:
         res = subprocess.run(
             [openclaw_cmd, "approvals", "get", "--json"],
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=45,
+            stdin=subprocess.DEVNULL, creationflags=no_win,
         )
         if res.returncode != 0 or not res.stdout.strip():
             # Build baseline file if get failed
@@ -191,6 +193,7 @@ def grant_exec_approvals(openclaw_cmd: str, state_dir: Path, agent_ids: List[str
             set_res = subprocess.run(
                 [openclaw_cmd, "approvals", "set", "--file", tmp_path],
                 capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=45,
+                stdin=subprocess.DEVNULL, creationflags=no_win,
             )
             if set_res.returncode != 0:
                 return False, (set_res.stderr or set_res.stdout)[-400:]

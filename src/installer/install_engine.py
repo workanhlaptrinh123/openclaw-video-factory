@@ -65,6 +65,9 @@ def bundle_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
 def _run(cmd, cwd=None, timeout=300, env=None):
     return subprocess.run(
         cmd,
@@ -76,6 +79,7 @@ def _run(cmd, cwd=None, timeout=300, env=None):
         errors="replace",
         timeout=timeout,
         stdin=subprocess.DEVNULL,
+        creationflags=NO_WINDOW,
     )
 
 
@@ -261,7 +265,7 @@ def run_install(
                     subprocess.run(
                         ["powershell", "-NoLogo", "-NoProfile", "-Command",
                          f"[Environment]::SetEnvironmentVariable('TOKEN_CODEX_API_KEY', '{opts.api_key.strip()}', 'User')"],
-                        capture_output=True, timeout=20, stdin=subprocess.DEVNULL,
+                        capture_output=True, timeout=20, stdin=subprocess.DEVNULL, creationflags=NO_WINDOW,
                     )
                 if opts.pixabay_key.strip():
                     env_lines.append(f"PIXABAY_API_KEY={opts.pixabay_key.strip()}")

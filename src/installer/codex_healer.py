@@ -65,6 +65,7 @@ def _try_codex_cli(
             errors="replace",
             timeout=180,
             stdin=subprocess.DEVNULL,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
         out = (res.stdout or "") + "\n" + (res.stderr or "")
         if res.returncode == 0:
@@ -141,6 +142,7 @@ def _try_codex_api(
                 errors="replace",
                 timeout=180,
                 stdin=subprocess.DEVNULL,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
             if r.returncode != 0:
                 log_fn(f"  [Codex API] Lệnh trả mã {r.returncode}: {(r.stderr or r.stdout)[-200:]}")
