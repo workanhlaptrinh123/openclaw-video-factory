@@ -394,14 +394,28 @@ def run_install(
 
             exec_with_heal(5, s6)
 
-            # Step 7: Verify agents & gateway ready
+            # Step 7: Wait until Gateway is truly reachable & Telegram channel is running before declaring done
             def s7():
-                on_log("  Đang chờ Gateway mở cổng và kiểm tra danh sách agent...")
-                time.sleep(10)
-                r = _run([opts.env.openclaw_cmd, "agents", "list", "--bindings"], timeout=45)
-                if r.returncode != 0:
-                    raise RuntimeError("Không đọc được danh sách agent: " + (r.stderr or r.stdout)[-300:])
-                on_log(r.stdout.strip())
+                on_log("  Đang chờ Gateway khởi động hoàn tất và kết nối Telegram (có thể mất 1-2 phút)...")
+                deadline = time.time() + 160
+                ready = False
+                while time.time() < deadline:
+                    r = _run([opts.env.openclaw_cmd, "channels", "status", "--probe"], timeout=45)
+                    txt = (r.stdout or "") + "\n" + (r.stderr or "")
+                    if "Gateway reachable" in txt and ("running, connected" in txt or "works" in txt):
+                        on_log("  ✓ Gateway đã online và Telegram đã kết nối sẵn sàng!")
+                        for ln in txt.splitlines():
+                            if "Telegram" in ln:
+                                on_log("  " + ln.strip())
+                        ready = True
+                        break
+                    rem = max(0, int(deadline - time.time()))
+                    on_log(f"  ...Gateway vẫn đang khởi động các plugin (chờ thêm, còn tối đa {rem}s)")
+                    time.sleep(10)
+                if not ready:
+                    r_ag = _run([opts.env.openclaw_cmd, "agents", "list", "--bindings"], timeout=45)
+                    on_log(r_ag.stdout.strip())
+                    on_log("  Lưu ý: Gateway đang hoàn tất khởi động nền, vui lòng đợi thêm ~30s rồi nhắn cho bot.")
 
             exec_with_heal(6, s7)
         else:
