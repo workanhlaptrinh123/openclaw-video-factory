@@ -15,7 +15,7 @@ from oauth_connect import (
 from openclaw_detect import detect_installed_modules, detect_openclaw, verify_api_key, verify_telegram_token
 from openclaw_merge import restore_latest_backup
 
-APP_VERSION = "v26.11.2026"
+APP_VERSION = "v27.11.2026"
 
 # Clean light palette matching installer_emtroly
 BG_CANVAS = "#F1F5F9"
@@ -231,10 +231,10 @@ class InstallerApp(tk.Tk):
         self.use_existing_api_btn = tk.Button(api_hint_row, text="Lấy key sẵn từ OpenClaw", command=self._load_existing_api,
                                               bg=BG_INFO, fg=PRIMARY, relief="flat", font=("Segoe UI", 8, "bold"), padx=6, pady=1, cursor="hand2")
 
-        # Pexels Key
-        tk.Label(t1, text="Pexels API Key (tuỳ chọn):", bg=BG_CARD, fg=TEXT_SUB, font=("Segoe UI", 9)).grid(row=5, column=0, sticky="w", pady=4)
-        self.pexels_var = tk.StringVar()
-        px_wrap, _ = self._entry(t1, self.pexels_var)
+        # Pixabay Key (miễn phí tại pixabay.com/api/docs)
+        tk.Label(t1, text="Pixabay API Key (tuỳ chọn):", bg=BG_CARD, fg=TEXT_SUB, font=("Segoe UI", 9)).grid(row=5, column=0, sticky="w", pady=4)
+        self.pixabay_var = tk.StringVar()
+        px_wrap, _ = self._entry(t1, self.pixabay_var)
         px_wrap.grid(row=5, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=4)
 
         # Codex Self-Heal Checkbox
@@ -554,7 +554,7 @@ class InstallerApp(tk.Tk):
             bot_token=self.token_var.get().strip(),
             owner_ids=owners,
             api_key=self.api_var.get().strip(),
-            pexels_key=self.pexels_var.get().strip(),
+            pixabay_key=self.pixabay_var.get().strip(),
             enable_codex_heal=self.heal_var.get(),
             install_video_core=self.mod_video_var.get(),
             install_google=self.mod_google_var.get(),
@@ -601,7 +601,7 @@ class InstallerApp(tk.Tk):
                 "Chẩn đoán thủ công",
                 log_text,
                 self.env.state_dir,
-                [self.token_var.get().strip(), self.api_var.get().strip(), self.pexels_var.get().strip()],
+                [self.token_var.get().strip(), self.api_var.get().strip(), self.pixabay_var.get().strip()],
                 self._append_log,
             )
             self.after(0, lambda: messagebox.showinfo("Kết quả Codex", f"{'Thành công' if ok else 'Chưa sửa được'}: {msg[:300]}"))

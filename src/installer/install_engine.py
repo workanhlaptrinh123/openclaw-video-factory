@@ -33,7 +33,7 @@ class InstallOptions:
     bot_token: str = ""
     owner_ids: List[str] = None
     api_key: str = ""
-    pexels_key: str = ""
+    pixabay_key: str = ""
     enable_codex_heal: bool = True
     # Modular selection flags (Cài từng phần)
     install_video_core: bool = True
@@ -104,7 +104,7 @@ def run_install(
     """Execute all 7 installation steps with optional Codex self-healing."""
     sd = Path(opts.env.state_dir)
     vf_dir = sd / "video-factory"
-    secrets = [opts.bot_token, opts.api_key, opts.pexels_key]
+    secrets = [opts.bot_token, opts.api_key, opts.pixabay_key]
     py_exe = {"path": ""}
 
     def exec_with_heal(idx: int, fn: Callable[[], None]):
@@ -263,8 +263,8 @@ def run_install(
                          f"[Environment]::SetEnvironmentVariable('TOKEN_CODEX_API_KEY', '{opts.api_key.strip()}', 'User')"],
                         capture_output=True, timeout=20, stdin=subprocess.DEVNULL,
                     )
-                if opts.pexels_key.strip():
-                    env_lines.append(f"PEXELS_API_KEY={opts.pexels_key.strip()}")
+                if opts.pixabay_key.strip():
+                    env_lines.append(f"PIXABAY_API_KEY={opts.pixabay_key.strip()}")
                 if env_lines:
                     (vf_dir / ".env").write_text("\n".join(env_lines) + "\n", encoding="utf-8")
 

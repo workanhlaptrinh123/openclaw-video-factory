@@ -21,8 +21,8 @@ Dùng skill này khi người dùng yêu cầu tạo video ngắn, video reel, v
      - `text`: dòng tiêu đề ngắn cho cảnh 1 (hook mở đầu <= 8 từ, hiển thị 3 giây đầu).
      - Một trong 3 nguồn hình ảnh:
        - `image_prompt` (ưu tiên mặc định): mô tả chi tiết bằng tiếng Anh cho ảnh dọc 9:16 photorealistic (tự tạo song song bằng `cx/gpt-image-2`). Không yêu cầu chữ/logo trong ảnh.
+       - `pixabay_query`: từ khóa tiếng Anh tìm video/ảnh nền miễn phí từ Pixabay (dùng khi `{{VIDEO_FACTORY_DIR}}\.env` có `PIXABAY_API_KEY`).
        - `image`: đường dẫn file ảnh có sẵn trên máy.
-       - `pexels_query`: từ khóa tiếng Anh tìm video nền Pexels (chỉ dùng nếu `{{VIDEO_FACTORY_DIR}}\.env` có `PEXELS_API_KEY`).
 
 2. **Báo tiến độ ngắn trước khi render**:
    - Gửi đúng 1 tin nhắn tiến độ bằng công cụ `message` trước khi chạy lệnh render.

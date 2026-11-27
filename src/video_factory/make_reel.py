@@ -121,6 +121,19 @@ def load_pexels_api_key() -> str:
     return ""
 
 
+def load_pixabay_api_key() -> str:
+    key = os.environ.get("PIXABAY_API_KEY", "").strip()
+    if key:
+        return key
+    env_file = ROOT / ".env"
+    if env_file.is_file():
+        for line in env_file.read_text(encoding="utf-8-sig").splitlines():
+            line = line.strip()
+            if line.startswith("PIXABAY_API_KEY="):
+                return line.split("=", 1)[1].strip().strip('"').strip("'")
+    return ""
+
+
 def load_pronunciation_rules():
     if not PRONUNCIATION_FILE.is_file():
         return []
@@ -322,6 +335,68 @@ def generate_ai_image(prompt: str, dest_png: Path, api_key: str) -> Path:
     raise RuntimeError(f"AI image generation failed: {last_err}")
 
 
+def fetch_pixabay_clip(query: str, seconds: float, dest_mp4: Path, api_key: str) -> Path:
+    """Fetch HD video from Pixabay Videos API; fall back to Pixabay vertical photo -> Ken Burns clip."""
+    if not api_key:
+        raise RuntimeError("PIXABAY_API_KEY not set in video-factory/.env")
+    q = urllib.parse.quote(query)
+    # 1) Try Pixabay Videos API
+    vid_url = f"https://pixabay.com/api/videos/?key={urllib.parse.quote(api_key)}&q={q}&per_page=10&safesearch=true"
+    req = urllib.request.Request(vid_url, headers={"User-Agent": "OpenClawVideoFactory/1.0"})
+    hits = []
+    try:
+        with urllib.request.urlopen(req, timeout=45) as resp:
+            hits = json.loads(resp.read().decode("utf-8")).get("hits") or []
+    except Exception:
+        hits = []
+
+    chosen_url = ""
+    if hits:
+        # Prefer clips at least as long as needed, then pick large/medium MP4
+        long_hits = [h for h in hits if float(h.get("duration", 0)) >= seconds] or hits
+        for h in long_hits:
+            vids = h.get("videos") or {}
+            for tier in ("large", "medium", "small"):
+                u = (vids.get(tier) or {}).get("url")
+                if u:
+                    chosen_url = u
+                    break
+            if chosen_url:
+                break
+
+    if chosen_url:
+        raw_mp4 = dest_mp4.with_suffix(".raw.mp4")
+        req_dl = urllib.request.Request(chosen_url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req_dl, timeout=120) as resp, raw_mp4.open("wb") as f:
+            shutil.copyfileobj(resp, f)
+        ffmpeg = find_bin("ffmpeg")
+        vf = "scale=1080:1920:force_original_aspect_ratio=increase:flags=bicubic,crop=1080:1920,fps=30,format=yuv420p"
+        subprocess.run(
+            [ffmpeg, "-nostdin", "-hide_banner", "-v", "error", "-y", "-stream_loop", "-1",
+             "-i", str(raw_mp4), "-t", f"{seconds + 0.5:.3f}", "-vf", vf,
+             "-c:v", "libx264", "-preset", "fast", "-crf", "20", "-an", "-movflags", "+faststart", str(dest_mp4)],
+            check=True, timeout=180, stdin=subprocess.DEVNULL,
+        )
+        raw_mp4.unlink(missing_ok=True)
+        return dest_mp4
+
+    # 2) Fallback: Pixabay Photos API (vertical photo -> smooth Ken Burns clip)
+    img_url = f"https://pixabay.com/api/?key={urllib.parse.quote(api_key)}&q={q}&image_type=photo&orientation=vertical&per_page=10&safesearch=true"
+    req_img = urllib.request.Request(img_url, headers={"User-Agent": "OpenClawVideoFactory/1.0"})
+    with urllib.request.urlopen(req_img, timeout=45) as resp:
+        img_hits = json.loads(resp.read().decode("utf-8")).get("hits") or []
+    if not img_hits:
+        raise RuntimeError(f"No Pixabay videos or photos found for query: {query}")
+    photo_link = img_hits[0].get("largeImageURL") or img_hits[0].get("webformatURL")
+    raw_img = dest_mp4.with_suffix(".jpg")
+    req_p = urllib.request.Request(photo_link, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req_p, timeout=60) as resp, raw_img.open("wb") as f:
+        shutil.copyfileobj(resp, f)
+    image_to_clip(raw_img, seconds, dest_mp4)
+    raw_img.unlink(missing_ok=True)
+    return dest_mp4
+
+
 def fetch_pexels_clip(query: str, seconds: float, dest_mp4: Path, api_key: str) -> Path:
     if not api_key:
         raise RuntimeError("PEXELS_API_KEY not set in video-factory/.env")
@@ -445,9 +520,15 @@ def build_reel(script_path: Path) -> dict:
 
     # Step 2: Generate / fetch scene visuals in parallel
     needs_ai = any(str(s.get("image_prompt") or "").strip() and not str(s.get("image") or "").strip() for s in scenes)
-    needs_pexels = any(str(s.get("pexels_query") or "").strip() and not str(s.get("image_prompt") or "").strip() and not str(s.get("image") or "").strip() for s in scenes)
+    needs_stock = any(
+        (str(s.get("pixabay_query") or "").strip() or str(s.get("pexels_query") or "").strip())
+        and not str(s.get("image_prompt") or "").strip()
+        and not str(s.get("image") or "").strip()
+        for s in scenes
+    )
     codex_key = load_codex_api_key() if needs_ai else ""
-    pexels_key = load_pexels_api_key() if needs_pexels else ""
+    pixabay_key = load_pixabay_api_key() if needs_stock else ""
+    pexels_key = load_pexels_api_key() if needs_stock else ""
 
     def prep_visual(item):
         i = item["index"]
@@ -465,10 +546,19 @@ def build_reel(script_path: Path) -> dict:
             generate_ai_image(sc["image_prompt"].strip(), dest_png, codex_key)
             image_to_clip(dest_png, dur, dest_mp4)
             return str(sc.get("image_source") or AI_CREDIT)
-        if str(sc.get("pexels_query") or "").strip():
-            fetch_pexels_clip(sc["pexels_query"].strip(), dur, dest_mp4, pexels_key)
+        if str(sc.get("pixabay_query") or "").strip():
+            fetch_pixabay_clip(sc["pixabay_query"].strip(), dur, dest_mp4, pixabay_key)
             return ""
-        raise ValueError(f"Scene {i} requires one of: image_prompt, pexels_query, or image")
+        if str(sc.get("pexels_query") or "").strip():
+            q = sc["pexels_query"].strip()
+            if pexels_key:
+                fetch_pexels_clip(q, dur, dest_mp4, pexels_key)
+            elif pixabay_key:
+                fetch_pixabay_clip(q, dur, dest_mp4, pixabay_key)
+            else:
+                raise RuntimeError("PIXABAY_API_KEY (or PEXELS_API_KEY) not set in video-factory/.env")
+            return ""
+        raise ValueError(f"Scene {i} requires one of: image_prompt, pixabay_query, pexels_query, or image")
 
     credits = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
