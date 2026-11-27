@@ -48,10 +48,12 @@ PRONUNCIATION_FILE = ROOT / "config" / "pronunciation.json"
 IMAGE_URL = "https://codex.anhlaptrinh.vn/v1/images/generations"
 IMAGE_MODEL = "cx/gpt-image-2"
 AI_CREDIT = "Ảnh minh họa tạo bằng AI"
-STYLE_SUFFIX = (
-    " Photorealistic, natural light, real Vietnamese people where relevant, "
-    "documentary photo style, vertical 9:16 composition, no text, no logo, no watermark."
-)
+
+ASPECT_PRESETS = {
+    "9:16": {"width": 1080, "height": 1920, "img_size": "1024x1536", "pixabay_orient": "vertical", "pexels_orient": "portrait", "comp_desc": "vertical 9:16 composition"},
+    "16:9": {"width": 1920, "height": 1080, "img_size": "1536x1024", "pixabay_orient": "horizontal", "pexels_orient": "landscape", "comp_desc": "horizontal 16:9 widescreen cinematic composition"},
+    "1:1":  {"width": 1080, "height": 1080, "img_size": "1024x1024", "pixabay_orient": "all", "pexels_orient": "square", "comp_desc": "square 1:1 balanced composition"},
+}
 
 DEFAULT_VOICE = "vi-VN-NamMinhNeural"
 DEFAULT_RATE = "+5%"
@@ -291,8 +293,13 @@ def synth_scene_voice(text: str, voice: str, rate: str, rules, dest_mp3: Path, d
     return float(meta["duration"]), cues
 
 
-def generate_ai_image(prompt: str, dest_png: Path, api_key: str) -> Path:
-    cache_key = sha256_bytes(json.dumps(["img-v1", IMAGE_MODEL, prompt], sort_keys=True).encode("utf-8"))
+def generate_ai_image(prompt: str, dest_png: Path, api_key: str, preset: dict) -> Path:
+    img_size = preset["img_size"]
+    style_suffix = (
+        f" Photorealistic, natural light, real Vietnamese people where relevant, "
+        f"documentary photo style, {preset['comp_desc']}, no text, no logo, no watermark."
+    )
+    cache_key = sha256_bytes(json.dumps(["img-v2", IMAGE_MODEL, img_size, prompt], sort_keys=True).encode("utf-8"))
     cached = CACHE_DIR / "images" / f"{cache_key}.png"
     cached.parent.mkdir(parents=True, exist_ok=True)
     if cached.is_file() and cached.stat().st_size > 10000:
@@ -301,8 +308,8 @@ def generate_ai_image(prompt: str, dest_png: Path, api_key: str) -> Path:
 
     body = json.dumps({
         "model": IMAGE_MODEL,
-        "prompt": prompt + STYLE_SUFFIX,
-        "size": "1024x1536",
+        "prompt": prompt + style_suffix,
+        "size": img_size,
         "n": 1,
     }).encode("utf-8")
 
@@ -335,10 +342,11 @@ def generate_ai_image(prompt: str, dest_png: Path, api_key: str) -> Path:
     raise RuntimeError(f"AI image generation failed: {last_err}")
 
 
-def fetch_pixabay_clip(query: str, seconds: float, dest_mp4: Path, api_key: str) -> Path:
-    """Fetch HD video from Pixabay Videos API; fall back to Pixabay vertical photo -> Ken Burns clip."""
+def fetch_pixabay_clip(query: str, seconds: float, dest_mp4: Path, api_key: str, preset: dict) -> Path:
+    """Fetch HD video from Pixabay Videos API; fall back to Pixabay photo -> Ken Burns clip."""
     if not api_key:
         raise RuntimeError("PIXABAY_API_KEY not set in video-factory/.env")
+    w, h = preset["width"], preset["height"]
     q = urllib.parse.quote(query)
     # 1) Try Pixabay Videos API
     vid_url = f"https://pixabay.com/api/videos/?key={urllib.parse.quote(api_key)}&q={q}&per_page=10&safesearch=true"
@@ -352,10 +360,9 @@ def fetch_pixabay_clip(query: str, seconds: float, dest_mp4: Path, api_key: str)
 
     chosen_url = ""
     if hits:
-        # Prefer clips at least as long as needed, then pick large/medium MP4
-        long_hits = [h for h in hits if float(h.get("duration", 0)) >= seconds] or hits
-        for h in long_hits:
-            vids = h.get("videos") or {}
+        long_hits = [x for x in hits if float(x.get("duration", 0)) >= seconds] or hits
+        for item in long_hits:
+            vids = item.get("videos") or {}
             for tier in ("large", "medium", "small"):
                 u = (vids.get(tier) or {}).get("url")
                 if u:
@@ -370,7 +377,7 @@ def fetch_pixabay_clip(query: str, seconds: float, dest_mp4: Path, api_key: str)
         with urllib.request.urlopen(req_dl, timeout=120) as resp, raw_mp4.open("wb") as f:
             shutil.copyfileobj(resp, f)
         ffmpeg = find_bin("ffmpeg")
-        vf = "scale=1080:1920:force_original_aspect_ratio=increase:flags=bicubic,crop=1080:1920,fps=30,format=yuv420p"
+        vf = f"scale={w}:{h}:force_original_aspect_ratio=increase:flags=bicubic,crop={w}:{h},fps=30,format=yuv420p"
         subprocess.run(
             [ffmpeg, "-nostdin", "-hide_banner", "-v", "error", "-y", "-stream_loop", "-1",
              "-i", str(raw_mp4), "-t", f"{seconds + 0.5:.3f}", "-vf", vf,
@@ -380,8 +387,9 @@ def fetch_pixabay_clip(query: str, seconds: float, dest_mp4: Path, api_key: str)
         raw_mp4.unlink(missing_ok=True)
         return dest_mp4
 
-    # 2) Fallback: Pixabay Photos API (vertical photo -> smooth Ken Burns clip)
-    img_url = f"https://pixabay.com/api/?key={urllib.parse.quote(api_key)}&q={q}&image_type=photo&orientation=vertical&per_page=10&safesearch=true"
+    # 2) Fallback: Pixabay Photos API -> smooth Ken Burns clip
+    orient = preset["pixabay_orient"]
+    img_url = f"https://pixabay.com/api/?key={urllib.parse.quote(api_key)}&q={q}&image_type=photo&orientation={orient}&per_page=10&safesearch=true"
     req_img = urllib.request.Request(img_url, headers={"User-Agent": "OpenClawVideoFactory/1.0"})
     with urllib.request.urlopen(req_img, timeout=45) as resp:
         img_hits = json.loads(resp.read().decode("utf-8")).get("hits") or []
@@ -392,33 +400,33 @@ def fetch_pixabay_clip(query: str, seconds: float, dest_mp4: Path, api_key: str)
     req_p = urllib.request.Request(photo_link, headers={"User-Agent": "Mozilla/5.0"})
     with urllib.request.urlopen(req_p, timeout=60) as resp, raw_img.open("wb") as f:
         shutil.copyfileobj(resp, f)
-    image_to_clip(raw_img, seconds, dest_mp4)
+    image_to_clip(raw_img, seconds, dest_mp4, preset)
     raw_img.unlink(missing_ok=True)
     return dest_mp4
 
 
-def fetch_pexels_clip(query: str, seconds: float, dest_mp4: Path, api_key: str) -> Path:
+def fetch_pexels_clip(query: str, seconds: float, dest_mp4: Path, api_key: str, preset: dict) -> Path:
     if not api_key:
         raise RuntimeError("PEXELS_API_KEY not set in video-factory/.env")
-    url = f"https://api.pexels.com/videos/search?query={urllib.parse.quote(query)}&orientation=portrait&per_page=10"
+    w, h = preset["width"], preset["height"]
+    orient = preset["pexels_orient"]
+    url = f"https://api.pexels.com/videos/search?query={urllib.parse.quote(query)}&orientation={orient}&per_page=10"
     req = urllib.request.Request(url, headers={"Authorization": api_key, "User-Agent": "OpenClawVideoFactory/1.0"})
     with urllib.request.urlopen(req, timeout=60) as resp:
         data = json.loads(resp.read().decode("utf-8"))
-    videos = [v for v in data.get("videos", []) if float(v.get("duration", 0)) >= seconds]
-    if not videos:
-        videos = data.get("videos", [])
+    videos = [v for v in data.get("videos", []) if float(v.get("duration", 0)) >= seconds] or data.get("videos", [])
     if not videos:
         raise RuntimeError(f"No Pexels videos found for query: {query}")
     video = videos[0]
     files = [f for f in video.get("video_files", []) if f.get("file_type") == "video/mp4" and f.get("width")]
-    files.sort(key=lambda f: (f["width"] < 1080 or f["height"] < 1920, abs(f["width"] * f["height"] - 1080 * 1920)))
+    files.sort(key=lambda f: (f["width"] < w or f["height"] < h, abs(f["width"] * f["height"] - w * h)))
     chosen = files[0]
     raw_mp4 = dest_mp4.with_suffix(".raw.mp4")
     req_dl = urllib.request.Request(chosen["link"], headers={"User-Agent": "Mozilla/5.0"})
     with urllib.request.urlopen(req_dl, timeout=120) as resp, raw_mp4.open("wb") as f:
         shutil.copyfileobj(resp, f)
     ffmpeg = find_bin("ffmpeg")
-    vf = "scale=1080:1920:force_original_aspect_ratio=increase:flags=bicubic,crop=1080:1920,fps=30,format=yuv420p"
+    vf = f"scale={w}:{h}:force_original_aspect_ratio=increase:flags=bicubic,crop={w}:{h},fps=30,format=yuv420p"
     subprocess.run(
         [ffmpeg, "-nostdin", "-hide_banner", "-v", "error", "-y", "-stream_loop", "-1",
          "-i", str(raw_mp4), "-t", f"{seconds + 0.5:.3f}", "-vf", vf,
@@ -429,14 +437,15 @@ def fetch_pexels_clip(query: str, seconds: float, dest_mp4: Path, api_key: str) 
     return dest_mp4
 
 
-def image_to_clip(src_img: Path, seconds: float, dest_mp4: Path) -> Path:
+def image_to_clip(src_img: Path, seconds: float, dest_mp4: Path, preset: dict) -> Path:
     ffmpeg = find_bin("ffmpeg")
+    w, h = preset["width"], preset["height"]
+    sw, sh = int(round(w * 1.12)), int(round(h * 1.12))
     frames = max(30, int(round((seconds + 0.4) * 30)))
-    # Subtle smooth Ken Burns zoom-in (1.0 -> 1.06) on 1080x1920
     vf = (
-        "scale=1200:2134:force_original_aspect_ratio=increase:flags=bicubic,"
-        "crop=1200:2134,"
-        f"zoompan=z='min(zoom+0.0005,1.08)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={frames}:s=1080x1920:fps=30,"
+        f"scale={sw}:{sh}:force_original_aspect_ratio=increase:flags=bicubic,"
+        f"crop={sw}:{sh},"
+        f"zoompan=z='min(zoom+0.0005,1.08)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={frames}:s={w}x{h}:fps=30,"
         "format=yuv420p"
     )
     cmd = [
@@ -468,6 +477,11 @@ def build_reel(script_path: Path) -> dict:
     caption = str(script.get("caption") or title).strip()
     voice_name = str(script.get("voice") or DEFAULT_VOICE).strip()
     voice_rate = str(script.get("rate") or DEFAULT_RATE).strip()
+    aspect = str(script.get("aspect_ratio") or "9:16").strip()
+    if aspect not in ASPECT_PRESETS:
+        aspect = "9:16"
+    preset = ASPECT_PRESETS[aspect]
+    w, h = preset["width"], preset["height"]
     scenes = script.get("scenes") or []
     if not scenes:
         raise ValueError("Script must contain a non-empty 'scenes' list")
@@ -539,22 +553,22 @@ def build_reel(script_path: Path) -> dict:
             src = Path(sc["image"]).expanduser().resolve()
             if not src.is_file():
                 raise ValueError(f"Scene {i} local image not found: {src}")
-            image_to_clip(src, dur, dest_mp4)
+            image_to_clip(src, dur, dest_mp4, preset)
             return str(sc.get("image_source") or "")
         if str(sc.get("image_prompt") or "").strip():
             dest_png = ws / "input" / f"scene-{i}.png"
-            generate_ai_image(sc["image_prompt"].strip(), dest_png, codex_key)
-            image_to_clip(dest_png, dur, dest_mp4)
+            generate_ai_image(sc["image_prompt"].strip(), dest_png, codex_key, preset)
+            image_to_clip(dest_png, dur, dest_mp4, preset)
             return str(sc.get("image_source") or AI_CREDIT)
         if str(sc.get("pixabay_query") or "").strip():
-            fetch_pixabay_clip(sc["pixabay_query"].strip(), dur, dest_mp4, pixabay_key)
+            fetch_pixabay_clip(sc["pixabay_query"].strip(), dur, dest_mp4, pixabay_key, preset)
             return ""
         if str(sc.get("pexels_query") or "").strip():
             q = sc["pexels_query"].strip()
             if pexels_key:
-                fetch_pexels_clip(q, dur, dest_mp4, pexels_key)
+                fetch_pexels_clip(q, dur, dest_mp4, pexels_key, preset)
             elif pixabay_key:
-                fetch_pixabay_clip(q, dur, dest_mp4, pixabay_key)
+                fetch_pixabay_clip(q, dur, dest_mp4, pixabay_key, preset)
             else:
                 raise RuntimeError("PIXABAY_API_KEY (or PEXELS_API_KEY) not set in video-factory/.env")
             return ""
@@ -574,7 +588,13 @@ def build_reel(script_path: Path) -> dict:
     ]:
         if src.is_file():
             shutil.copy2(src, ws / "assets" / dst_name)
-    shutil.copy2(ROOT / "templates" / "fast-reel" / "styles.css", ws / "styles.css")
+    css_tpl = (ROOT / "templates" / "fast-reel" / "styles.css").read_text(encoding="utf-8")
+    css_rendered = css_tpl.replace("1080px", f"{w}px").replace("1920px", f"{h}px")
+    if aspect == "16:9":
+        css_rendered += "\n#hook{top:120px;left:180px;right:180px;font-size:56px}\n.subtitle{bottom:72px;max-width:1520px;font-size:34px}\n.scrim-top{height:280px}\n.scrim-bottom{height:300px}\n"
+    elif aspect == "1:1":
+        css_rendered += "\n#hook{top:110px;font-size:52px}\n.subtitle{bottom:70px;max-width:940px;font-size:32px}\n.scrim-top{height:260px}\n.scrim-bottom{height:280px}\n"
+    (ws / "styles.css").write_text(css_rendered, encoding="utf-8")
     shutil.copy2(ROOT / "package.json", ws / "package.json")
 
     parts = []
@@ -615,7 +635,9 @@ def build_reel(script_path: Path) -> dict:
 
     tpl = (ROOT / "templates" / "fast-reel" / "index.template.html").read_text(encoding="utf-8")
     rendered_html = (
-        tpl.replace("__TITLE__", html.escape(title))
+        tpl.replace('width=1080, height=1920', f'width={w}, height={h}')
+        .replace('data-width="1080" data-height="1920"', f'data-width="{w}" data-height="{h}"')
+        .replace("__TITLE__", html.escape(title))
         .replace("__DURATION__", str(total_duration))
         .replace("__CLIPS__", "\n    ".join(parts))
     )
@@ -643,8 +665,8 @@ def build_reel(script_path: Path) -> dict:
     vstream = next((s for s in streams if s.get("codec_type") == "video"), {})
     astream = next((s for s in streams if s.get("codec_type") == "audio"), None)
     actual_dur = float(probe["format"]["duration"])
-    if (vstream.get("width"), vstream.get("height")) != (1080, 1920):
-        raise RuntimeError(f"Unexpected dimensions: {vstream.get('width')}x{vstream.get('height')}")
+    if (vstream.get("width"), vstream.get("height")) != (w, h):
+        raise RuntimeError(f"Unexpected dimensions: {vstream.get('width')}x{vstream.get('height')} (expected {w}x{h})")
     if not astream:
         raise RuntimeError("Rendered MP4 is missing audio stream")
     if abs(actual_dur - total_duration) > 1.2:

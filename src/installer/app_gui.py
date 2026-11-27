@@ -48,7 +48,7 @@ STEP_BADGES = {
 class InstallerApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title(f"OpenClaw Video Factory {APP_VERSION} — Cài đặt Tạo Video 9:16")
+        self.title(f"OpenClaw Video Factory {APP_VERSION} — Cài đặt Tạo Video 9:16 · 16:9 · 1:1")
         self.geometry("1080x780")
         self.minsize(980, 700)
         self.configure(bg=BG_CANVAS)
@@ -104,7 +104,7 @@ class InstallerApp(tk.Tk):
         title_row.pack(fill="x")
         tk.Label(title_row, text="🎬 OpenClaw Video Factory", font=("Segoe UI", 16, "bold"), bg=BG_CARD, fg=TEXT_MAIN).pack(side="left")
         tk.Label(title_row, text=f"  {APP_VERSION}", font=("Segoe UI", 10, "bold"), bg=BG_INFO, fg=PRIMARY, padx=8, pady=2).pack(side="left", padx=(10, 0))
-        tk.Label(topbar, text="Cài đặt tính năng tạo video dọc 9:16 + tự động đăng bài vào OpenClaw đang chạy trên máy",
+        tk.Label(topbar, text="Cài đặt tính năng tạo video (dọc 9:16, ngang 16:9, vuông 1:1) + tự động đăng bài vào OpenClaw đang chạy",
                  font=("Segoe UI", 10), bg=BG_CARD, fg=TEXT_SUB).pack(anchor="w", pady=(3, 0))
 
         # Main 2-Column Body
@@ -137,7 +137,7 @@ class InstallerApp(tk.Tk):
         self.mod_yt_var = tk.BooleanVar(value=False)
         self.mod_badges = {}
         for key, var, label in [
-            ("video", self.mod_video_var, "🎬 Tạo Video 9:16"),
+            ("video", self.mod_video_var, "🎬 Tạo Video (9:16 · 16:9 · 1:1)"),
             ("google", self.mod_google_var, "📊 Google Sheet & Drive"),
             ("facebook", self.mod_fb_var, "📘 Đăng Facebook"),
             ("youtube", self.mod_yt_var, "▶️ Đăng YouTube"),

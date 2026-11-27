@@ -16,6 +16,7 @@ Dùng skill này khi người dùng yêu cầu tạo video ngắn, video reel, v
    - `caption`: mô tả + hashtag đăng bài.
    - `voice`: `"vi-VN-NamMinhNeural"` (mặc định giọng nam) hoặc `"vi-VN-HoaiMyNeural"` (giọng nữ nếu người dùng yêu cầu).
    - `rate`: `"+5%"` (mặc định).
+   - `aspect_ratio`: `"9:16"` (video dọc TikTok/Reels/Shorts — mặc định), `"16:9"` (video ngang YouTube/Facebook 1920×1080), hoặc `"1:1"` (video vuông 1080×1080).
    - `scenes`: danh sách 4–8 cảnh (mỗi cảnh ~10–18 từ tiếng Việt, khoảng 3–6 giây):
      - `voice`: lời thoại tiếng Việt tự nhiên, rõ câu, kết thúc bằng dấu chấm/hỏi/chấm than.
      - `text`: dòng tiêu đề ngắn cho cảnh 1 (hook mở đầu <= 8 từ, hiển thị 3 giây đầu).
