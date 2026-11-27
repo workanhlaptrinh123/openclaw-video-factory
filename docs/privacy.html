@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Privacy Policy &amp; User Data Deletion — OpenClaw Video Factory</title>
+  <style>
+    body { font-family: 'Segoe UI', system-ui, sans-serif; max-width: 760px; margin: 40px auto; padding: 0 20px; color: #0F172A; line-height: 1.65; }
+    h1 { color: #1E3A8A; }
+    h2 { color: #2563EB; margin-top: 28px; }
+    code { background: #F1F5F9; padding: 2px 6px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Privacy Policy &amp; User Data Deletion — OpenClaw Video Factory</h1>
+  <p><strong>Last updated:</strong> November 27, 2026<br />
+     <strong>Contact:</strong> workanhlaptrinh123@gmail.com</p>
+
+  <h2>1. Overview</h2>
+  <p>OpenClaw Video Factory is a local desktop automation tool that helps content creators generate short-form videos and publish approved videos to their own connected platforms (Google Drive, Google Sheets, YouTube, and Facebook Pages).</p>
+
+  <h2>2. Data Collection &amp; Storage</h2>
+  <ul>
+    <li><strong>Local-only storage:</strong> All OAuth access tokens, refresh tokens, API keys, generated videos, and configuration files are stored exclusively on the user's own computer.</li>
+    <li><strong>No external server storage:</strong> OpenClaw Video Factory does not operate any remote database and never transmits, sells, or shares user tokens or personal data to third parties.</li>
+    <li><strong>Permissions used:</strong>
+      <ul>
+        <li><strong>Facebook (<code>pages_show_list</code>, <code>pages_read_engagement</code>, <code>pages_manage_posts</code>):</strong> Used only to list the Facebook Pages managed by the authenticated user and publish user-approved videos to the Page chosen by the user.</li>
+        <li><strong>Google (<code>drive.file</code>, <code>spreadsheets</code>, <code>youtube.upload</code>):</strong> Used only to manage the user's approval spreadsheet, upload generated videos to the user's Google Drive, and upload user-approved videos to the user's YouTube channel.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h2>3. User Data Deletion Instructions</h2>
+  <p>Because all credentials are stored locally on your computer, you can delete all your data immediately at any time:</p>
+  <ol>
+    <li><strong>Delete local credentials on your PC:</strong> Delete the folder <code>&lt;openclaw_state_dir&gt;\video-factory\secrets\</code>.</li>
+    <li><strong>Revoke Facebook access:</strong> Go to <em>Facebook Settings &amp; Privacy &rarr; Settings &rarr; Business Integrations</em> (or <em>Apps and Websites</em>), find <strong>OpenClaw Video Factory</strong>, and click <strong>Remove</strong>.</li>
+    <li><strong>Revoke Google access:</strong> Visit <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>, find <strong>OpenClaw Video Factory</strong>, and click <strong>Remove Access</strong>.</li>
+  </ol>
+  <p>For assistance, contact us at <a href="mailto:workanhlaptrinh123@gmail.com">workanhlaptrinh123@gmail.com</a>.</p>
+</body>
+</html>
