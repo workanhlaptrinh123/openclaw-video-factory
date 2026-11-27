@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OpenClaw Video Factory — OAuth Callback</title>
+  <style>
+    body { font-family: 'Segoe UI', system-ui, sans-serif; text-align: center; padding: 60px 20px; color: #0F172A; background: #F8FAFC; }
+    .card { max-width: 480px; margin: 0 auto; background: #fff; border: 1px solid #E2E8F0; border-radius: 12px; padding: 28px; }
+    h2 { color: #2563EB; margin-top: 0; }
+    p { color: #475569; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Đang chuyển về OpenClaw Video Factory...</h2>
+    <p id="msg">Vui lòng giữ cửa sổ ứng dụng OpenClaw Video Factory đang mở.</p>
+  </div>
+  <script>
+    (function () {
+      var target = "http://127.0.0.1:18765/callback" + window.location.search + window.location.hash;
+      window.location.replace(target);
+    })();
+  </script>
+</body>
+</html>

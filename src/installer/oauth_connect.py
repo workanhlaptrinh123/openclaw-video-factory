@@ -17,6 +17,9 @@ from typing import Dict, List, Tuple
 
 REDIRECT_PORT = 18765
 REDIRECT_URI = f"http://127.0.0.1:{REDIRECT_PORT}/callback"
+# Meta enforces HTTPS for all OAuth Redirect URIs (including Live mode).
+# Static GitHub Pages relay forwards ?code=... locally in the user's browser to 127.0.0.1:18765/callback.
+FACEBOOK_REDIRECT_URI = "https://workanhlaptrinh123.github.io/openclaw-video-factory/oauth-callback.html"
 
 # Safe, zero-CASA-fee Google scopes (drive.file only touches files created by this app)
 GOOGLE_SCOPES = [
@@ -201,7 +204,7 @@ def connect_facebook_get_pages(app_id: str, app_secret: str) -> Dict:
 
     params = urllib.parse.urlencode({
         "client_id": app_id,
-        "redirect_uri": REDIRECT_URI,
+        "redirect_uri": FACEBOOK_REDIRECT_URI,
         "response_type": "code",
         "scope": ",".join(FACEBOOK_SCOPES),
     })
@@ -213,7 +216,7 @@ def connect_facebook_get_pages(app_id: str, app_secret: str) -> Dict:
     qs = urllib.parse.urlencode({
         "client_id": app_id,
         "client_secret": app_secret,
-        "redirect_uri": REDIRECT_URI,
+        "redirect_uri": FACEBOOK_REDIRECT_URI,
         "code": code_or_err,
     })
     with urllib.request.urlopen(f"https://graph.facebook.com/v21.0/oauth/access_token?{qs}", timeout=30) as r:
