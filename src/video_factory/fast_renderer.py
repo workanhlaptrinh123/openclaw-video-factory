@@ -171,7 +171,7 @@ def render_fast_reel(
         inputs += ["-i", str(ws / "input" / f"voice-{i}.mp3")]
         v_in = idx * 2
         a_in = idx * 2 + 1
-        v_filters.append(f"[{v_in}:v]trim=0:{dur:.3f},setpts=PTS-STARTPTS,fps=30,scale={w}:{h},format=yuv420p[v{idx}]")
+        v_filters.append(f"[{v_in}:v]trim=0:{dur:.3f},setpts=PTS-STARTPTS,fps=30,scale={w}:{h},setsar=1,format=yuv420p[v{idx}]")
         a_filters.append(f"[{a_in}:a]apad,atrim=0:{dur:.3f},asetpts=PTS-STARTPTS,aresample=48000,aformat=channel_layouts=stereo[a{idx}]")
 
     v_concat = "".join(f"[v{idx}]" for idx in range(n)) + f"concat=n={n}:v=1:a=0[vbase]"
@@ -218,20 +218,21 @@ def render_fast_reel(
             ov_filters.append(f"{cur_label}[{in_idx}:v]overlay={ox}:{oy}:format=auto:enable='between(t,{s0:.3f},{s1:.3f})'{next_label}")
         cur_label = next_label
 
-    # Subtle cyan progress bar along bottom edge (height 7px)
+    # Smooth animated cyan progress bar along bottom edge (height 7px)
     prog_h = 7
     ov_filters.append(
-        f"{cur_label}drawbox=x=0:y={h - prog_h}:w='iw*t/{max(0.1, total_duration):.3f}':h={prog_h}:color=0x0ed4e7@0.95:t=fill[vout]"
+        f"color=c=0x0ed4e7@0.95:s={w}x{prog_h}:r=30:d={max(0.1, total_duration):.3f}[pbar]"
+    )
+    ov_filters.append(
+        f"{cur_label}[pbar]overlay=x='-w+w*t/{max(0.1, total_duration):.3f}':y={h - prog_h}:format=auto[vout]"
     )
 
-    fc = ";\n".join(v_filters + a_filters + [v_concat, a_concat] + ov_filters)
-    fc_file = ws / "filter_complex.txt"
-    fc_file.write_text(fc, encoding="utf-8")
+    fc = ";".join(v_filters + a_filters + [v_concat, a_concat] + ov_filters)
 
     cmd = [
         ffmpeg, "-nostdin", "-hide_banner", "-v", "error", "-y",
         *inputs,
-        "-filter_complex_script", str(fc_file),
+        "-filter_complex", fc,
         "-map", "[vout]", "-map", "[amaster]",
         "-c:v", "libx264", "-profile:v", "high", "-preset", "fast", "-crf", "20", "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart",
