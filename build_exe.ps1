@@ -22,6 +22,10 @@ $vpy = "$root\.build-venv\Scripts\python.exe"
 
 $exeName = "OpenClaw-VideoFactory-Setup-$ver"
 
+if (-not (Test-Path "$root\src\installer\app_oauth_config.json")) {
+  Copy-Item "$root\src\installer\app_oauth_config.example.json" "$root\src\installer\app_oauth_config.json"
+}
+
 & $vpy -m PyInstaller `
   --noconfirm `
   --clean `

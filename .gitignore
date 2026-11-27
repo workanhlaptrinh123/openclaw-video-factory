@@ -12,6 +12,7 @@ dist/
 *.secret
 .env
 openclaw.json
+src/installer/app_oauth_config.json
 workspaces/
 output/
 scripts_in/

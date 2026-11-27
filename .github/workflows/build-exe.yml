@@ -36,6 +36,27 @@ jobs:
           "VERSION=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           Write-Host "Build version: $v"
 
+      - name: Inject OAuth App Config from Repository Secrets
+        shell: pwsh
+        env:
+          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+          GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+          FB_APP_ID: ${{ secrets.FB_APP_ID }}
+          FB_APP_SECRET: ${{ secrets.FB_APP_SECRET }}
+        run: |
+          $cfg = @{
+            google = @{
+              client_id = if ($env:GOOGLE_OAUTH_CLIENT_ID) { $env:GOOGLE_OAUTH_CLIENT_ID } else { "" }
+              client_secret = if ($env:GOOGLE_OAUTH_CLIENT_SECRET) { $env:GOOGLE_OAUTH_CLIENT_SECRET } else { "" }
+            }
+            facebook = @{
+              app_id = if ($env:FB_APP_ID) { $env:FB_APP_ID } else { "" }
+              app_secret = if ($env:FB_APP_SECRET) { $env:FB_APP_SECRET } else { "" }
+            }
+          }
+          $cfg | ConvertTo-Json -Depth 4 | Set-Content -Path "src\installer\app_oauth_config.json" -Encoding utf8
+          Write-Host ("OAuth config generated: Google=" + [bool]$env:GOOGLE_OAUTH_CLIENT_ID + ", Facebook=" + [bool]$env:FB_APP_ID)
+
       - name: Build OpenClaw-VideoFactory-Setup.exe
         shell: pwsh
         run: |
