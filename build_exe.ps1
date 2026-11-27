@@ -1,7 +1,14 @@
 # Build standalone Windows EXE: dist\OpenClaw-VideoFactory-Setup.exe
+param([string]$Version = "")
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $root
+
+if (-not $Version) {
+  $m = [regex]::Match((Get-Content -Raw "$root\src\installer\app_gui.py"), 'APP_VERSION\s*=\s*"([^"]+)"')
+  $Version = if ($m.Success) { $m.Groups[1].Value } else { "v" + (Get-Date -Format "dd.MM.yyyy") }
+}
+$ver = $Version
 
 $py = "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe"
 if (-not (Test-Path $py)) { $py = (Get-Command python).Source }
@@ -13,7 +20,6 @@ $vpy = "$root\.build-venv\Scripts\python.exe"
 & $vpy -m pip install --upgrade pip --quiet
 & $vpy -m pip install pyinstaller --quiet
 
-$ver = "v" + (Get-Date -Format "dd.MM.yyyy")
 $exeName = "OpenClaw-VideoFactory-Setup-$ver"
 
 & $vpy -m PyInstaller `
