@@ -62,6 +62,14 @@ def merge_openclaw_config(
     if api_key.strip() and not secret_file.is_file():
         secret_file.write_text(api_key.strip() + "\n", encoding="utf-8")
 
+    # 2.5 Always ensure Telegram mediaMaxMb >= 50 even in existing_bot mode
+    tg_root = (cfg.get("channels") or {}).get("telegram")
+    if isinstance(tg_root, dict):
+        tg_root["mediaMaxMb"] = max(int(tg_root.get("mediaMaxMb") or 0), 50)
+        for acc in (tg_root.get("accounts") or {}).values():
+            if isinstance(acc, dict):
+                acc["mediaMaxMb"] = max(int(acc.get("mediaMaxMb") or 0), 50)
+
     # 3. Separate bot mode: add telegram account + video-creator agent + binding
     if mode == "separate_bot":
         token_file = state_dir / "telegram-video.token"

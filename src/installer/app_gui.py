@@ -188,24 +188,22 @@ class InstallerApp(tk.Tk):
         t1.columnconfigure(1, weight=1, minsize=260)
         t1.columnconfigure(2, weight=0)
 
-        # Mode radio
+        # Mode radio (Mặc định: Gắn vào Bot hiện có của khách)
         m_row = tk.Frame(t1, bg=BG_INFO, padx=12, pady=8)
         m_row.grid(row=0, column=0, columnspan=3, sticky="ew", pady=(0, 10))
         tk.Label(m_row, text="Chế độ cài:", font=("Segoe UI", 10, "bold"), bg=BG_INFO, fg=TEXT_MAIN).pack(side="left")
-        self.mode_var = tk.StringVar(value="separate_bot")
-        tk.Radiobutton(m_row, text="Tạo Bot Video riêng (Khuyên dùng)", variable=self.mode_var, value="separate_bot",
+        self.mode_var = tk.StringVar(value="existing_bot")
+        tk.Radiobutton(m_row, text="Gắn vào Bot hiện có (Khuyên dùng)", variable=self.mode_var, value="existing_bot",
                        bg=BG_INFO, fg=TEXT_MAIN, activebackground=BG_INFO, command=self._toggle_mode).pack(side="left", padx=(12, 16))
-        tk.Radiobutton(m_row, text="Gắn vào Bot hiện có", variable=self.mode_var, value="existing_bot",
+        tk.Radiobutton(m_row, text="Tạo thêm Bot Video riêng", variable=self.mode_var, value="separate_bot",
                        bg=BG_INFO, fg=TEXT_MAIN, activebackground=BG_INFO, command=self._toggle_mode).pack(side="left")
 
-        # Telegram Bot Token
-        tk.Label(t1, text="Telegram Bot Token:", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 10, "bold")).grid(row=1, column=0, sticky="w", pady=(4, 2))
+        # Telegram Bot Token (chỉ hiện khi chọn 'Tạo thêm Bot Video riêng')
+        self.tok_lbl = tk.Label(t1, text="Telegram Bot Token:", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 10, "bold"))
         self.token_var = tk.StringVar()
-        tok_wrap, self.token_entry = self._entry(t1, self.token_var)
-        tok_wrap.grid(row=1, column=1, sticky="ew", padx=8, pady=(4, 2))
+        self.tok_wrap, self.token_entry = self._entry(t1, self.token_var)
         self.check_tok_btn = tk.Button(t1, text="Kiểm tra Bot", command=self._check_token, bg=BG_SUBTLE, fg=TEXT_MAIN,
                                        relief="solid", bd=1, font=("Segoe UI", 9), padx=10, pady=4, cursor="hand2")
-        self.check_tok_btn.grid(row=1, column=2, pady=(4, 2))
 
         # Telegram Owner ID
         tk.Label(t1, text="Telegram ID chủ máy:", bg=BG_CARD, fg=TEXT_MAIN, font=("Segoe UI", 10, "bold")).grid(row=2, column=0, sticky="w", pady=4)
@@ -322,6 +320,7 @@ class InstallerApp(tk.Tk):
         self.yt_en_var = self.mod_yt_var
 
         self._refresh_modular_ui()
+        self._toggle_mode()
 
         # Action Bar
         act = tk.Frame(right, bg=BG_CANVAS, pady=10)
@@ -466,11 +465,17 @@ class InstallerApp(tk.Tk):
 
     def _toggle_mode(self):
         is_sep = self.mode_var.get() == "separate_bot"
-        state = "normal" if is_sep else "disabled"
-        self.token_entry.config(state=state)
-        self.check_tok_btn.config(state=state)
         if is_sep:
+            self.tok_lbl.grid(row=1, column=0, sticky="w", pady=(4, 2))
+            self.tok_wrap.grid(row=1, column=1, sticky="ew", padx=8, pady=(4, 2))
+            self.check_tok_btn.grid(row=1, column=2, pady=(4, 2))
+            self.token_entry.config(state="normal")
+            self.check_tok_btn.config(state="normal")
             self.token_entry.focus_set()
+        else:
+            self.tok_lbl.grid_remove()
+            self.tok_wrap.grid_remove()
+            self.check_tok_btn.grid_remove()
 
     def _append_log(self, msg: str):
         self.after(0, lambda: (self.log_box.insert("end", msg + "\n"), self.log_box.see("end")))
