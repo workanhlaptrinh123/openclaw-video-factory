@@ -1,9 +1,21 @@
 # -*- coding: utf-8 -*-
 """Executive Sidebar Multi-Page Windows Installer for OpenClaw Video Factory (modeled after installer_emtroly)."""
+import ctypes
+import sys
 import threading
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, scrolledtext, ttk
+
+# Enable crisp Windows High-DPI rendering (prevents blurry text/cursor on 125%/150% displays)
+if sys.platform == "win32":
+    try:
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)
+    except Exception:
+        try:
+            ctypes.windll.user32.SetProcessDPIAware()
+        except Exception:
+            pass
 
 from codex_healer import auto_heal
 from install_engine import InstallOptions, STEPS, run_install
@@ -15,7 +27,7 @@ from oauth_connect import (
 from openclaw_detect import detect_installed_modules, detect_openclaw, verify_api_key, verify_telegram_token
 from openclaw_merge import restore_latest_backup
 
-APP_VERSION = "v27.11.2026.3"
+APP_VERSION = "v27.11.2026.4"
 
 # Executive Light Palette (matching installer_emtroly)
 BG_CANVAS = "#F1F5F9"
