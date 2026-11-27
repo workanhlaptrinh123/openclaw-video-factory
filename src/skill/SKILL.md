@@ -21,9 +21,10 @@ Dùng skill này khi người dùng yêu cầu tạo video ngắn, video reel, v
      - `voice`: lời thoại tiếng Việt tự nhiên, rõ câu, kết thúc bằng dấu chấm/hỏi/chấm than.
      - `text`: dòng tiêu đề ngắn cho cảnh 1 (hook mở đầu <= 8 từ, hiển thị 3 giây đầu).
      - Một trong 3 nguồn hình ảnh:
-       - `image_prompt` (ưu tiên mặc định): mô tả chi tiết bằng tiếng Anh cho ảnh dọc 9:16 photorealistic (tự tạo song song bằng `cx/gpt-image-2`). Không yêu cầu chữ/logo trong ảnh.
+       - `video`: đường dẫn file video MP4/MOV do khách gửi qua Telegram hoặc có sẵn trên máy (tự căn khung, cắt/lặp khớp lời thoại và lồng giọng đọc + phụ đề).
+       - `image`: đường dẫn file ảnh do khách gửi qua Telegram hoặc có sẵn trên máy (tự tạo chuyển động zoom mượt).
+       - `image_prompt` (khi khách không gửi ảnh/video): mô tả chi tiết bằng tiếng Anh cho ảnh photorealistic (tự tạo song song bằng `cx/gpt-image-2`). Không yêu cầu chữ/logo trong ảnh.
        - `pixabay_query`: từ khóa tiếng Anh tìm video/ảnh nền miễn phí từ Pixabay (dùng khi `{{VIDEO_FACTORY_DIR}}\.env` có `PIXABAY_API_KEY`).
-       - `image`: đường dẫn file ảnh có sẵn trên máy.
 
 2. **Báo tiến độ ngắn trước khi render**:
    - Gửi đúng 1 tin nhắn tiến độ bằng công cụ `message` trước khi chạy lệnh render.

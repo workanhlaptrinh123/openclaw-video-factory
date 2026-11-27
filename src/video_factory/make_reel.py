@@ -458,6 +458,22 @@ def image_to_clip(src_img: Path, seconds: float, dest_mp4: Path, preset: dict) -
     return dest_mp4
 
 
+def prepare_local_video(src_vid: Path, seconds: float, dest_mp4: Path, preset: dict) -> Path:
+    """Scale, crop, and loop/trim a customer-provided MP4/MOV clip to exact target dimensions."""
+    ffmpeg = find_bin("ffmpeg")
+    w, h = preset["width"], preset["height"]
+    vf = f"scale={w}:{h}:force_original_aspect_ratio=increase:flags=bicubic,crop={w}:{h},fps=30,format=yuv420p"
+    cmd = [
+        ffmpeg, "-nostdin", "-hide_banner", "-v", "error", "-y",
+        "-stream_loop", "-1", "-i", str(src_vid),
+        "-t", f"{seconds + 0.4:.3f}", "-vf", vf,
+        "-c:v", "libx264", "-preset", "fast", "-crf", "20", "-an", "-movflags", "+faststart",
+        str(dest_mp4),
+    ]
+    subprocess.run(cmd, check=True, timeout=180, stdin=subprocess.DEVNULL)
+    return dest_mp4
+
+
 def hyperframes_bin() -> list:
     hf_js = ROOT / "node_modules" / "hyperframes" / "dist" / "cli.js"
     if hf_js.is_file():
@@ -549,6 +565,12 @@ def build_reel(script_path: Path) -> dict:
         sc = item["scene"]
         dur = item["duration"]
         dest_mp4 = ws / "input" / f"scene-{i}.mp4"
+        if str(sc.get("video") or sc.get("local_video") or "").strip():
+            src_v = Path(str(sc.get("video") or sc.get("local_video"))).expanduser().resolve()
+            if not src_v.is_file():
+                raise ValueError(f"Scene {i} local video not found: {src_v}")
+            prepare_local_video(src_v, dur, dest_mp4, preset)
+            return str(sc.get("image_source") or "")
         if str(sc.get("image") or "").strip():
             src = Path(sc["image"]).expanduser().resolve()
             if not src.is_file():
@@ -572,7 +594,7 @@ def build_reel(script_path: Path) -> dict:
             else:
                 raise RuntimeError("PIXABAY_API_KEY (or PEXELS_API_KEY) not set in video-factory/.env")
             return ""
-        raise ValueError(f"Scene {i} requires one of: image_prompt, pixabay_query, pexels_query, or image")
+        raise ValueError(f"Scene {i} requires one of: video, image, image_prompt, pixabay_query, or pexels_query")
 
     credits = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
@@ -643,21 +665,35 @@ def build_reel(script_path: Path) -> dict:
     )
     (ws / "index.html").write_text(rendered_html, encoding="utf-8")
 
-    # Step 4: HyperFrames check + render
+    # Step 4: Render via Fast Full HD Engine (default: Pillow 2x + FFmpeg, ~10-15s) or HyperFrames (multi-core)
+    engine = str(script.get("engine") or "fast").strip().lower()
     final_mp4 = out_dir / "final.mp4"
-    hf = hyperframes_bin()
-    for step in ("lint", "validate"):
-        r = subprocess.run(hf + [step], cwd=str(ws), capture_output=True, text=True, timeout=180, stdin=subprocess.DEVNULL)
-        if r.returncode != 0:
-            raise RuntimeError(f"hyperframes {step} failed: {(r.stderr or r.stdout)[-500:]}")
-
-    r_render = subprocess.run(
-        hf + ["render", ".", "--workers", "1", "--quality", "looks", "--fps", "30",
-              "--no-browser-gpu", "--sdr", "-o", str(final_mp4)],
-        cwd=str(ws), capture_output=True, text=True, timeout=1800, stdin=subprocess.DEVNULL,
-    )
-    if r_render.returncode != 0 or not final_mp4.is_file():
-        raise RuntimeError(f"hyperframes render failed: {(r_render.stderr or r_render.stdout)[-600:]}")
+    if engine == "hyperframes":
+        hf = hyperframes_bin()
+        workers = min(4, max(2, (os.cpu_count() or 4) // 2))
+        r_val = subprocess.run(hf + ["validate"], cwd=str(ws), capture_output=True, text=True, timeout=180, stdin=subprocess.DEVNULL)
+        if r_val.returncode != 0:
+            raise RuntimeError(f"hyperframes validate failed: {(r_val.stderr or r_val.stdout)[-500:]}")
+        r_render = subprocess.run(
+            hf + ["render", ".", "--workers", str(workers), "--quality", "looks", "--fps", "30",
+                  "--no-browser-gpu", "--sdr", "-o", str(final_mp4)],
+            cwd=str(ws), capture_output=True, text=True, timeout=1800, stdin=subprocess.DEVNULL,
+        )
+        if r_render.returncode != 0 or not final_mp4.is_file():
+            raise RuntimeError(f"hyperframes render failed: {(r_render.stderr or r_render.stdout)[-600:]}")
+    else:
+        from fast_renderer import render_fast_reel
+        render_fast_reel(
+            ffmpeg=find_bin("ffmpeg"),
+            ws=ws,
+            timeline=timeline,
+            total_duration=total_duration,
+            w=w,
+            h=h,
+            title=title,
+            font_bold=ROOT / "assets" / "fonts" / "BeVietnamPro-Bold.ttf",
+            final_mp4=final_mp4,
+        )
 
     # Step 5: Technical verification (ffprobe + full decode)
     probe = ffprobe_info(final_mp4)

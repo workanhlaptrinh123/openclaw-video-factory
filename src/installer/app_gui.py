@@ -15,7 +15,7 @@ from oauth_connect import (
 from openclaw_detect import detect_installed_modules, detect_openclaw, verify_api_key, verify_telegram_token
 from openclaw_merge import restore_latest_backup
 
-APP_VERSION = "v27.11.2026.1"
+APP_VERSION = "v27.11.2026.2"
 
 # Executive Light Palette (matching installer_emtroly)
 BG_CANVAS = "#F1F5F9"

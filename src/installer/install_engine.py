@@ -207,6 +207,7 @@ def run_install(
             if opts.install_video_core:
                 for rel in (
                     "make_reel.py",
+                    "fast_renderer.py",
                     "package.json",
                     "config/pronunciation.json",
                     "assets/fonts/BeVietnamPro-Regular.ttf",
